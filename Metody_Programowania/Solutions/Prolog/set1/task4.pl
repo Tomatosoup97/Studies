@@ -46,15 +46,11 @@ cousin(X, Y) :-
     (X \== Y).
 
 descendant(X, Y) :-
-    parent(Y, X);
-    (parent(Y, Z), descendant(X, Z)).
-
-descendant_v2(X, Y) :-
     parent(Y, X).
 
-descendant_v2(X, Y) :-
+descendant(X, Y) :-
     parent(Y, Z),
-    descendant(X, Z)).
+    descendant(X, Z).
 
 is_mother(X) :-
     parent(X, _),
@@ -63,3 +59,8 @@ is_mother(X) :-
 is_father(X) :-
     parent(X, _),
     male(X).
+
+% ?- descendant(john, mark).
+% ?- descendant(adam, X).
+% ?- sister(X, ivonne).
+% ?- cousin(X, Y).

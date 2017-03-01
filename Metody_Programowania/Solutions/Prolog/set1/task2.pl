@@ -34,5 +34,5 @@ comeAcross(ANIMAL, PERSON) :-
 
 animal(X) :- smok(X).
 
-haveVisitors(ZOO) :-
-    haveDragons(ZOO).
+human(fowler).
+visitZoo(fowler).
