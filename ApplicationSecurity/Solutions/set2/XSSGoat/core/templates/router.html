@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load staticfiles %}
+
+
+{% block head %}
+
+{% endblock head %}
+
+
+{% block content %}
+
+<h1 class="header">XSS Goat</h1>
+
+<ul class="links">
+    <li><a href="{% url "csp:base" %}">CSP</a></li>
+    <li><a href="{% url "csp:base" %}">CSP reporting API</a></li>
+</ul>
+
+{% endblock content %}
+
+
+{% block scripts %}
+
+{% endblock scripts %}
