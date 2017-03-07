@@ -16,8 +16,7 @@ CSP_DEFAULT_SRC = (
 CSP_STYLE_SRC = (
     "'self'",
     'fonts.googleapis.com',
-    'yui.yahooapis.com',
-    'yui-s.yahooapis.com',
+    'https://unpkg.com/purecss@0.6.2/build/pure-min.css',
 )
 CSP_FONT_SRC = (
     "'self'",
@@ -32,9 +31,10 @@ CSP_SCRIPT_SRC = (
 
 CSP_EXCLUDE_URL_PREFIXES = (
     "/admin",
+    "/csp/api",
 )
 
 # CSP Report Only
 
 CSP_REPORT_ONLY = True
-CSP_REPORT_URI = 'http://127.0.0.1:8000/csp/api'
+CSP_REPORT_URI = '/csp/api/voilation-reports/'

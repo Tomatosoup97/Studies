@@ -13,7 +13,9 @@
 
 <ul class="links">
     <li><a href="{% url "csp:base" %}">CSP</a></li>
-    <li><a href="{% url "csp:base" %}">CSP reporting API</a></li>
+    <li><a href="{% url "csp:api:api-root" %}">CSP reporting API</a></li>
+    <li><a href="{% url "xssheader:user-welcome-page" %}">Reflected XSS + X-XSS-Protection header</a></li>
+    <li><a href="{% url "storedxss:comments-list" %}">Stored XSS (Comments)</a></li>
 </ul>
 
 {% endblock content %}
