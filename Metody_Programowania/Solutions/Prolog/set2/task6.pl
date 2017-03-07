@@ -11,6 +11,7 @@ sublist_v1(L, S) :-
 sublist(_, []).
 sublist([H|LT], [H|ST]) :-
     sublist(LT, ST).
+
 sublist(L, S) :-
     [_|LT] = L,
     sublist(LT, S).
