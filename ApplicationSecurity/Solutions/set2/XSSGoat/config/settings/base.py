@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'core',
     'xssheader',
     'storedxss',
+    'sql_inj',
     'rest_framework'
 ]
 

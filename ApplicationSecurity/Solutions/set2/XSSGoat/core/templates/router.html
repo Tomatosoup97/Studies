@@ -10,12 +10,15 @@
 {% block content %}
 
 <h1 class="header">XSS Goat</h1>
+<img src="{% static "img/webgoat.jpg" %}" class="logo">
 
 <ul class="links">
+    <li><a href="{% url "events:events-list" %}">SQL Injection (Events)</a></li>
+    <li><a href="{% url "storedxss:comments-list" %}">Stored XSS (Comments)</a></li>
+    <li><a href="{% url "xssheader:user-welcome-page" %}">
+        Reflected XSS + X-XSS-Protection header</a></li>
     <li><a href="{% url "csp:base" %}">CSP</a></li>
     <li><a href="{% url "csp:api:api-root" %}">CSP reporting API</a></li>
-    <li><a href="{% url "xssheader:user-welcome-page" %}">Reflected XSS + X-XSS-Protection header</a></li>
-    <li><a href="{% url "storedxss:comments-list" %}">Stored XSS (Comments)</a></li>
 </ul>
 
 {% endblock content %}
