@@ -9,5 +9,6 @@ urlpatterns = [
     url(r'^user-welcome/', include('xssheader.urls', namespace='xssheader')),
     url(r'^comments/', include('storedxss.urls', namespace='storedxss')),
     url(r'^events/', include('sql_inj.urls', namespace='events')),
+    url(r'^dom/', include('domxss.urls', namespace='dom')),
     url(r'^', include('core.urls', namespace='core')),
 ]
