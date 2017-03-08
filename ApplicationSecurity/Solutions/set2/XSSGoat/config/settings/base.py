@@ -43,7 +43,8 @@ INSTALLED_APPS = [
     'storedxss',
     'domxss',
     'sql_inj',
-    'rest_framework'
+    'cookies',
+    'rest_framework',
 ]
 
 MIDDLEWARE = [

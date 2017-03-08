@@ -10,5 +10,6 @@ urlpatterns = [
     url(r'^comments/', include('storedxss.urls', namespace='storedxss')),
     url(r'^events/', include('sql_inj.urls', namespace='events')),
     url(r'^dom/', include('domxss.urls', namespace='dom')),
+    url(r'^cookies/', include('cookies.urls', namespace='cookies')),
     url(r'^', include('core.urls', namespace='core')),
 ]
