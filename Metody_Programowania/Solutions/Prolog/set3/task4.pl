@@ -1,4 +1,4 @@
-%% Can be optimalized
+%% Can be optimized
 select_min([X], X).
 select_min([H1, H2|T], Min) :-
     H1 =< H2,

@@ -1,4 +1,3 @@
-
 perm([], []).
 perm([LH|LT], P) :-
     perm(LT, PT),

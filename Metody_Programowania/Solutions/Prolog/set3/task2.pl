@@ -1,20 +1,16 @@
-
 filter([], []).
 filter([H|LT], [H|PT]) :-
     H >= 0,
-    filter(LT, PT),
-    !.
+    filter(LT, PT), !.
 filter([H|T], P) :-
     H < 0,
     filter(T, P).
 
 
-%% Check twice cut location
 count(_, [], 0).
 count(Elem, [Elem|LT], Count) :-
     count(Elem, LT, CountR),
-    Count is CountR + 1,
-    !.
+    Count is CountR + 1, !.
 count(Elem, [_|LT], Count) :-
     count(Elem, LT, Count).
 
