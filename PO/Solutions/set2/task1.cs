@@ -2,14 +2,17 @@ using System;
 
 
 public class IntStream {
-   public int num = 0;
+   private int num = 0;
 
    public int next() {
       this.num += 1;
+      if (this.eos()) {
+         throw new System.Exception("Num too big");
+      }
       return this.num;
    }
 
-   public bool eos() {
+   private bool eos() {
       if (this.num == 2147483647) {
          return true;
       }
@@ -23,7 +26,7 @@ public class IntStream {
 
 
 public class PrimeStream : IntStream {
-   bool is_prime(int n) {
+   protected bool is_prime(int n) {
       for (int i=2; i<Math.Sqrt(n)+1; i++) {
          if (n % i == 0) {
             return false;
@@ -48,7 +51,7 @@ public class PrimeStream : IntStream {
 
 
 public class RandomStream : IntStream {
-   public Random rand;
+   private Random rand;
 
    public RandomStream() {
       this.rand = new Random();
@@ -65,10 +68,11 @@ public class RandomStream : IntStream {
 
 
 public class RandomWordStream {
-   public RandomStream randStream;
-   public PrimeStream primeStream;
+   private RandomStream randStream;
+   private PrimeStream primeStream;
 
-   public RandomWordStream(RandomStream randStream, PrimeStream primeStream) {
+   public RandomWordStream(RandomStream randStream,
+                           PrimeStream primeStream) {
       this.randStream = randStream;
       this.primeStream = primeStream;
    }

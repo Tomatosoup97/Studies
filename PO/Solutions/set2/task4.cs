@@ -3,8 +3,8 @@ using System.Linq;
 
 
 public class ListaLeniwa {
-    public int len = 0;
-    public int [] elements;
+    private int len = 0;
+    private int [] elements;
 
     virtual public int element(int i) {
         if (this.len == 0) {
@@ -31,7 +31,7 @@ public class ListaLeniwa {
 
 
 public class Pierwsze: ListaLeniwa {
-    bool isPrime(int n) {
+    protected bool isPrime(int n) {
         for (int i=2; i<Math.Sqrt(n)+1; i++) {
             if (n % i == 0) {
                 return false;
@@ -40,7 +40,7 @@ public class Pierwsze: ListaLeniwa {
         return true;
     }
 
-    public int getPrime(int k) {
+    protected int getPrime(int k) {
         if (k == 1) return 2;
         int j = 0;
         for (int i = 3; ; i+=2) {
@@ -55,7 +55,7 @@ public class Pierwsze: ListaLeniwa {
         int prime = this.getPrime(i);
         return base.element(prime);
     }
-}   
+}
 
 
 public class Program {
