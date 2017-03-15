@@ -1,0 +1,13 @@
+{
+  "name": "XSSGoat",
+  "version": "0.1.0",
+  "description": "Application for security testing purposes",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Mateusz Urbanczyk",
+  "devDependencies": {
+    "node-forge": "^0.7.0"
+  }
+}

@@ -4,5 +4,5 @@ from . import views
 
 
 urlpatterns = [
-    url(r'^$', views.CookiesView.as_view(), name='cookies'),
+    url(r'^$', views.cookies_view, name='cookies'),
 ]
