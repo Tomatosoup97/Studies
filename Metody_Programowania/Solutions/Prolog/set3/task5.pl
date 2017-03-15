@@ -1,12 +1,10 @@
 insert([], X, [X]).
 insert([H|T], Elem, Res) :-
-    Elem >= H,
-    insert(T, Elem, ResR), !,
+    Elem >= H, !,
+    insert(T, Elem, ResR),
     append([H], ResR, Res).
 
-insert([H|T], Elem, Res) :-
-    Elem < H,
-    Res = [Elem, H|T].
+insert([H|T], Elem, [Elem, H|T]).
 
 ins_sort([], []).
 ins_sort([H|T], Res) :-
