@@ -4,15 +4,15 @@ using System;
 public class IntStream {
    private int num = 0;
 
-   public int next() {
-      this.num += 1;
+   virtual public int next() {
       if (this.eos()) {
          throw new System.Exception("Num too big");
       }
+      this.num += 1;
       return this.num;
    }
 
-   private bool eos() {
+   public bool eos() {
       if (this.num == 2147483647) {
          return true;
       }
@@ -35,7 +35,7 @@ public class PrimeStream : IntStream {
       return true;
    }
 
-   public new int next() {
+   public override int next() {
       int prime = 1;
       while(!this.eos()) {
          if (this.is_prime(this.num)) {
@@ -57,7 +57,7 @@ public class RandomStream : IntStream {
       this.rand = new Random();
    }
 
-   public new int next() {
+   public override int next() {
       return this.rand.Next(65, 122);
    }
 
