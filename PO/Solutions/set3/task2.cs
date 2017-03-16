@@ -10,18 +10,39 @@ public class HashNode<K, V> {
         this.key = key;
         this.val = val;
     }
+    public void setOrUpdate(K key, V val) {
+        HashNode<K, V> head = this;
+        while (head.next != null) {
+            if (head.key.Equals(key)) {
+                head.val = val;
+                return;
+            }
+            head = head.next;
+        }
+    }
 }
 
 
 public class Slownik<K, V> {
-    /* Hash Map.
-       Uses separate chaining for handling collisions.
+    /* Hash Map implementation.
+
+    Collisions are handled by separate chaining.
+
+    Bucket (table) allocation is done dynamically,
+    Each time load factor exceeds certain value,
+    bucket capacity is doubled
+
+    For each new object hash calculated.
     */
     protected HashNode<K, V>[] bucket;
     protected int capacity;
     protected int size;
 
     public void allocateNewBucket(int capacity) {
+        if (this.bucket == null){
+            this.bucket = new HashNode<K, V>[this.capacity];
+            return;
+        }
         HashNode<K, V>[] tempBucket = this.bucket;
         this.bucket = new HashNode<K, V>[this.capacity];
 
@@ -38,6 +59,17 @@ public class Slownik<K, V> {
         this.allocateNewBucket(this.capacity);
     }
 
+    public void print() {
+        Console.WriteLine("{ ");
+        for (int i=0; i<this.capacity; i++) {
+            if (this.bucket[i] != null) {
+                Console.WriteLine(this.bucket[i].key + ": " +
+                                  this.bucket[i].val + ", ");
+            }
+        }
+        Console.WriteLine("}");
+    }
+
     public bool isEmpty() {
         return this.size == 0;
     }
@@ -46,9 +78,9 @@ public class Slownik<K, V> {
         return this.size;
     }
 
-    public int getBucketIndex(K key) {
-        int hashCode = key.GetHashCode();
-        return hashCode % capacity;
+    protected int getBucketIndex(K key) {
+        long hashCode = key.GetHashCode() & ~(1 << 63);
+        return (int)(hashCode % (this.capacity - 1));
     }
 
     protected double getLoadFactor() {
@@ -60,31 +92,27 @@ public class Slownik<K, V> {
         double loadFactor = this.getLoadFactor();
         if (loadFactor >= 0.7) {
             this.capacity *= 2;
-            allocateNewBucket(this.capacity);
+            this.allocateNewBucket(this.capacity);
         }
     }
 
     public void create(K key, V val) {
-        int index = getBucketIndex(key);
-        HashNode<K, V> head = bucket[index];
+        int index = this.getBucketIndex(key);
+        HashNode<K, V> head = this.bucket[index];
 
-        // If key is present, update value
-        while (head.next != null) {
-            if (head.key.Equals(key)) {
-                head.val = val;
-                return;
-            }
-            head = head.next;
+        if (head == null) {
+            this.bucket[index] = new HashNode<K, V>(key, val);
+        } else {
+            this.bucket[index].setOrUpdate(key, val);
         }
-        HashNode<K, V> newNode = new HashNode<K, V>(key, val);
-        head = newNode;
-        size++;
-        adjustCapacity();
+
+        this.size++;
+        this.adjustCapacity();
     }
 
     public V get(K key) {
-        int index = getBucketIndex(key);
-        HashNode<K, V> head = bucket[index];
+        int index = this.getBucketIndex(key);
+        HashNode<K, V> head = this.bucket[index];
         
         // Search key in chain
         while (head != null) {
@@ -96,8 +124,8 @@ public class Slownik<K, V> {
     }
 
     public V remove(K key) {
-        int index = getBucketIndex(key);
-        HashNode<K, V> head = bucket[index];
+        int index = this.getBucketIndex(key);
+        HashNode<K, V> head = this.bucket[index];
         HashNode<K, V> prev = null;
         while (head != null) {
             if (head.key.Equals(key)) break;
@@ -105,10 +133,11 @@ public class Slownik<K, V> {
             head = head.next;
         }
         if (head == null)
-            throw new System.Exception("Key Error: Element not found");
+            throw new System.Exception("Key Error: Element to remove not found");
         if (prev != null)
             prev.next = head.next;
-        else bucket[index] = head.next;
+        else this.bucket[index] = head.next;
+        this.size--;
         return head.val;
     }
 }
@@ -118,15 +147,34 @@ public class Program {
     public static void Main(string[] args) {
         Console.WriteLine("Hash Map: \n");
         Slownik<string, int> slownik = new Slownik<string, int>();
-        slownik.create("some", 1);
-        slownik.create("keys", 2);
-        slownik.create("for", 4);
-        slownik.create("hashmap", 5);
+        Console.WriteLine("Adding 3 elements... ");
+        slownik.create("first", 17);
+        slownik.create("second", 2);
+        slownik.create("third", 42);
+        Console.WriteLine("Created structure: ");
+        slownik.print();
+
+        Console.WriteLine("------");
+        Console.WriteLine("Size: ");
         Console.WriteLine(slownik.getSize());
-        Console.WriteLine(slownik.remove("some"));
-        Console.WriteLine(slownik.remove("keys"));
-        Console.WriteLine(slownik.get("for"));
-        Console.WriteLine(slownik.getSize());
+
+        Console.WriteLine("Removing second element... ");
+        Console.WriteLine(slownik.remove("second"));
+        slownik.print();
+        Console.WriteLine("------");
+        Console.WriteLine("Get third's value: ");
+
+
+        Console.WriteLine(slownik.get("third"));
+        // Console.WriteLine(slownik.get("for"));
+        Console.WriteLine("\nIs empty: ");
+        Console.WriteLine(slownik.isEmpty());
+
+        Console.WriteLine("Clearing hash table... ");
+        Console.WriteLine(slownik.remove("third"));
+        Console.WriteLine(slownik.remove("first"));
+        slownik.print();
+        Console.WriteLine("\nIs empty: ");
         Console.WriteLine(slownik.isEmpty());
     }
 }
