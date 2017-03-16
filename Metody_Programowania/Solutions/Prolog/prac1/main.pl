@@ -10,12 +10,24 @@ solve([], []).
 solve([L|CT], [(L, t)|ST]) :-
     literal(L),
     solve(CT, ST),
-    \+ member((L, f), ST).
+    \+ member((L, _), ST).
+
+solve([L|CT], S) :-
+    %% Don't add new (L, t) if already in S
+    literal(L),
+    solve(CT, S),
+    member((L, t), S).
 
 solve([~L|CT], [(L, f)|ST]) :-
     literal(L),
     solve(CT, ST),
-    \+ member((L, t), ST).
+    \+ member((L, _), ST).
+
+solve([~L|CT], S) :-
+    %% Don't add new (L, f) if already in S
+    literal(L),
+    solve(CT, S),
+    member((L, f), S).
 
 solve([A v B|T], S) :-
     solve([A|T], S);
