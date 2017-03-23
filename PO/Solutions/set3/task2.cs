@@ -10,6 +10,7 @@ public class HashNode<K, V> {
         this.key = key;
         this.val = val;
     }
+
     public void setOrUpdate(K key, V val) {
         HashNode<K, V> head = this;
         while (head.next != null) {
@@ -127,13 +128,15 @@ public class Slownik<K, V> {
         int index = this.getBucketIndex(key);
         HashNode<K, V> head = this.bucket[index];
         HashNode<K, V> prev = null;
+
         while (head != null) {
             if (head.key.Equals(key)) break;
             prev = head;
             head = head.next;
         }
+
         if (head == null)
-            throw new System.Exception("Key Error: Element to remove not found");
+            throw new System.Exception("Key Error: Element not found");
         if (prev != null)
             prev.next = head.next;
         else this.bucket[index] = head.next;

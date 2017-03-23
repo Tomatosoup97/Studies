@@ -63,6 +63,8 @@ public class Lista<T> {
         this.first = this.first.next; 
         if (this.first != null)
             this.first.prev = null;
+        if (this.size == 1)
+            this.last = null;
 
         this.size--;
         return top.val;
@@ -76,6 +78,8 @@ public class Lista<T> {
 
         if (this.last != null)
             this.last.next = null;
+        if (this.size == 1)
+            this.first = null;
 
         this.size--;
         return val;
