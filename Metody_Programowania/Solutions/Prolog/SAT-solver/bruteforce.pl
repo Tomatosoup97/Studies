@@ -1,4 +1,4 @@
-:- module(mateusz_urbanczyk, [solve/2]).
+:- module(main, [solve/2]).
 
 :- op(200, fx, ~).
 :- op(500, xfy, v).
