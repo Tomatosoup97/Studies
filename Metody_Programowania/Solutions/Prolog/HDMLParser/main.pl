@@ -1,4 +1,4 @@
-%% :- module(main, [parse/3]).
+:- module(main, [parse/3]).
 
 /*
     DCG Parser of HDML language for veryfing digital circuits
@@ -17,21 +17,22 @@
                      |      <pattern> , <pattern>
     <expr>          ::=     if <expr> then <expr> else <expr>
                      |      let <pattern> = <expr> in <expr>
-                     |      <expr op>
-    <expr op>       ::=     <expr op> <binary_op> <expr op>
-                     |      <unary_op> <expr op>
+                     |      <expr_op>
+    <expr_op>       ::=     <expr_op> <binary_op> <expr_op>
+                     |      <unary_op> <expr_op>
                      |      <simple_expr>
-    <binary_op>     ::=     , | = | <> | < | > | <= | >= | ^ | | | + | - | & | * | / | % | @
+    <binary_op>     ::=     , | = | <> | < | > | <= | >=
+                     |      ^ | | | + | - | & | * | / | % | @
     <unary_op>      ::=     - | # | ~
     <simple_expr>   ::=     ( <expr> )
-                     |      <byte_choice>
-                     |      <bytes_choice>
+                     |      <bit_select>
+                     |      <bits_select>
                      |      <atomic_expr>
-    <byte_choice>   ::=     <simple_expr> [ <expr> ]
-    <bytes_choice>  ::=     <simple_expr> [ <expr> .. <expr> ]
+    <bit_select>    ::=     <simple_expr> [ <expr> ]
+    <bits_select>   ::=     <simple_expr> [ <expr> .. <expr> ]
     <atomic_expr>   ::=     <variable>
                      |      <func_exec>
-                     |      <float_literal>
+                     |      <int_literal>
                      |      <empty_vector>
                      |      <single_bit>
     <variable>      ::=     <identifier>
@@ -39,6 +40,21 @@
     <empty_vector>  ::=     [ ]
     <single_bit>    ::=     [ <expr> ]
     <empty>         ::=
+
+
+    For convenience and readability, <expr_op> definition is shortcutted.
+    Here is full operator-precedence-aware grammar for <expr_op>:
+
+    <expr_op>       ::=     <expr_op1> <binary_op1  > <expr_op > | <expr_op1>
+    <expr_op1>      ::=     <expr_op2> <binary_op2  > <expr_op2> | <expr_op2>
+    <expr_op2>      ::=     <expr_op3> <binary_op3_r> <expr_op2> | <expr_op3>
+    <expr_op3>      ::=     <expr_op3> <binary_op3_l> <expr_op4> | <expr_op4>
+    <expr_op4>      ::=     <expr_op4> <binary_op5  > <expr_op_rest>
+    <expr_op_rest>  ::=     <unary_op> <unary_expr>
+                     |      <simple_expr>
+
+    <unary_expr>    ::=     <unary_op> <simple_expr>
+    <unary_expr>    ::=     <simple_expr>
 
 */
 
@@ -52,6 +68,7 @@
     @               | right         | 3
     = <> < > <= >=  | none          | 2
     ,               | right         | 1
+
 */
 
 /*
@@ -77,41 +94,35 @@
 *
 * */
 
+
 lexer(Tokens) -->
     white_space,
     (( "&",     !, { Token = tokenAnd }
      ; "*",     !, { Token = tokenMult }
      ; "/",     !, { Token = tokenDiv }
      ; "%",     !, { Token = tokenMod }
-     ; "|",     !, { Token = tokenOr }
-     ; "^",     !, { Token = tokenExp }
+     ; "|",     !, { Token = tokenPipe }
+     ; "^",     !, { Token = tokenCaret }
      ; "+",     !, { Token = tokenPlus }
      ; "-",     !, { Token = tokenMinus }
      ; "@",     !, { Token = tokenAt }
      ; "=",     !, { Token = tokenAssign }
      ; "<>",    !, { Token = tokenNe }
-     ; "<",     !, { Token = tokenLt }
-     ; ">",     !, { Token = tokenGt }
      ; "<=",    !, { Token = tokenLte }
      ; ">=",    !, { Token = tokenGte }
-     ; ",",     !, { Token = tokenComma }
+     ; "<",     !, { Token = tokenLt }
+     ; ">",     !, { Token = tokenGt }
      ; "..",    !, { Token = tokenDoubleDot }
+     ; ",",     !, { Token = tokenComma }
      ; "(",     !, { Token = tokenLParen }
      ; ")",     !, { Token = tokenRParen }
      ; "[",     !, { Token = tokenLBracket }
      ; "]",     !, { Token = tokenRBracket }
      ; "#",     !, { Token = tokenHash }
      ; "~",     !, { Token = tokenTilde }
-     ; digit(D1),
-         number(D1, N1),
-         ".", !,
-         digit(D2),
-         number(D2, N2),
-         { Token = tokenFloat(N1, N2) }
      ; digit(D),
          number(D, N),
          { Token = tokenNum(N) }
-         
      ; letter(L), !, identifier(L, Id),
          { member((Id, Token), [(def, tokenDef),
                                 (else, tokenElse),
@@ -119,11 +130,10 @@ lexer(Tokens) -->
                                 (in, tokenIn),
                                 (let, tokenLet),
                                 (then, tokenThen),
-                                ("_", tokenUnderscore)]),
+                                ('_', tokenWildcard)]),
            !
          ; Token = tokenVar(Id)
          }
-     ; [_], { Token = tokenUnknown }
      ),
      !,
      { Tokens = [Token | TokenList] },
@@ -133,10 +143,30 @@ lexer(Tokens) -->
     ).
 
 
+white_space --> comment, !, white_space.
 white_space -->
     [Char], { code_type(Char, space) }, !, white_space.
 white_space -->
     [].
+
+comment -->
+    [L, M], {
+        char_code('(', L),
+        char_code('*', M)
+    }, !,
+    comment_contents.
+
+comment_contents -->
+    comment, !,
+    comment_contents.
+
+comment_contents -->
+    [M, P], {
+        char_code('*', M),
+        char_code(')', P)
+    }, !.
+comment_contents --> [_], !, comment_contents.
+comment_contents --> [].
 
 
 digit(Digit) -->
@@ -185,16 +215,13 @@ identifier(L, Id) -->
 
 
 /*
-* SYNTAX ANALYSIS -- PARSER
-* BNF grammar listed at the beggining of the file
-*
-* */
+SYNTAX ANALYSIS -- PARSER
+BNF grammar listed at the beggining of the file
 
+*Left recursion* notes are left in places where grammar would go into
+infinite loops, thus, needs to be resolved in a slightly modified way
 
-% OPERATORS
-
-%:- op(900, xfy, def).
-
+*/
 
 
 % Parser
@@ -203,81 +230,150 @@ program(AST) -->
     definitions(AST).
 
 
-% TODO: Not sure about this one
 definitions(Defs) -->
     definition(DefHead), !,
     definitions(DefTail),
     { Defs = [DefHead | DefTail] }.
 
-definitions(Defs) --> empty(Defs).
+definitions([]) --> [].
 
 
 definition(Def) -->
-    [tokenDef], identifier(Id),
+    [tokenDef], [tokenVar(Id)],
     [tokenLParen], pattern(Pattern), [tokenRParen],
     [tokenAssign], expr(Expr),
     { Def = def(Id, Pattern, Expr) }.
 
 
+% Left recursion
+
 pattern(Pattern) -->
-    (   [tokenUnderscore], !,
-        { Pattern = wildcard(no) }
+    (   [tokenWildcard], !,
+        { PatternAcc = wildcard(no) }
 
     ;   variable(Var), !,
-        { Pattern = Var }
+        { PatternAcc = Var }
 
-    ;   [tokenLParen], !, pattern(Pattern), [tokenRParen]
+    ;   [tokenLParen], !, pattern(PatternAcc), [tokenRParen]
+    ),
+    pattern(PatternAcc, Pattern).
 
-    ;   pattern(Pattern1), [tokenComma], pattern(Pattern2),
-        { Pattern = pair(no, Pattern1, Pattern2) }
-    ).
+
+pattern(Acc, Pattern) -->
+    [tokenComma], !,
+    pattern(Pattern1),
+    { Pattern = pair(no, Acc, Pattern1) }.
+
+pattern(Acc, Acc) --> [].
 
 
 expr(Expr) -->
-    (   [tokenIf], expr(Expr1),
+    (   [tokenIf], expr(Expr1), !,
         [tokenThen], expr(Expr2),
         [tokenElse], expr(Expr3),
-        { Expr = if(no, Expr1, Expr2, Expr3) }, !
+        { Expr = if(no, Expr1, Expr2, Expr3) }
 
-    ;   [tokenLet], pattern(Pattern),
+    ;   [tokenLet], pattern(Pattern), !,
         [tokenAssign], expr(Expr1),
         [tokenIn], expr(Expr2),
-        { Expr = let(no, Pattern, Expr1, Expr2) }, !
-
-    ;   expr_op(ExprOp),
-        { Expr = ExprOp }
+        { Expr = let(no, Pattern, Expr1, Expr2) }
+    ;   expr_op(Expr)
     ).
 
 
-% Left-side recursion !!
-expr_op(Op) -->
-    (   expr_op(ExprOp1), !, binary_op(BinaryOp), expr_op(ExprOp2),
-        { Op = op(no, BinaryOp, ExprOp1, ExprOp2) }
-    
-    ;   unary_op(UnaryOp), !, expr_op(ExprOp),
-        { Op = op(no, UnaryOp, ExprOp) }
-    
-    ;   simple_expr(SimpleExpr),
-        { Op = SimpleExpr }
+expr_op(ExprOp) -->
+    expr_op1(ExprOp1),
+    binary_op_comma(_), !,
+    expr_op(ExprOp2),
+    { ExprOp = pair(no, ExprOp1, ExprOp2) }.
+
+expr_op(ExprOp) -->
+    expr_op1(ExprOp).
+
+expr_op1(ExprOp) -->
+    expr_op2(ExprOp1),
+    binary_op2(BinaryOp), !,
+    expr_op2(ExprOp2),
+    { ExprOp = op(no, BinaryOp, ExprOp1, ExprOp2) }.
+
+expr_op1(ExprOp) -->
+    expr_op2(ExprOp).
+
+
+expr_op2(ExprOp) -->
+    expr_op3(ExprOp1),
+    binary_op3_r(BinaryOp), !,
+    expr_op2(ExprOp2),
+    { ExprOp = op(no, BinaryOp, ExprOp1, ExprOp2) }.
+
+expr_op2(ExprOp) -->
+    expr_op3(ExprOp).
+
+% Left recursion
+
+expr_op3(ExprOp) -->
+    expr_op4(ExprOpAcc),
+    expr_op3(ExprOpAcc, ExprOp).
+
+expr_op3(Acc, ExprOp) -->
+    binary_op3_l(BinaryOp), !,
+    expr_op3(ExprOp2),
+    { ExprOp = op(no, BinaryOp, Acc, ExprOp2) }.
+
+expr_op3(Acc, Acc) --> [].
+
+% Left recursion
+
+expr_op4(ExprOp) -->
+    expr_op_rest(ExprOpAcc),
+    expr_op4(ExprOpAcc, ExprOp).
+
+expr_op4(Acc, ExprOp) -->
+    binary_op5(BinaryOp),
+    expr_op4(ExprOp1),
+    { ExprOp = op(no, BinaryOp, Acc, ExprOp1) }.
+
+expr_op4(Acc, Acc) --> [].
+
+
+expr_op_rest(ExprOp) -->
+    (   unary_op(UnaryOp), unary_expr(ExprOp1),
+        { ExprOp = op(no, UnaryOp, ExprOp1) }
+
+    ;   simple_expr(ExprOp)
     ).
 
+unary_expr(Expr) --> simple_expr(Expr), !.
+unary_expr(Expr) -->
+    unary_op(UnaryOp),
+    unary_expr(SimpleExpr),
+    { Expr = op(no, UnaryOp, SimpleExpr) }.
 
-binary_op(',') --> [tokenComma], !.
-binary_op(=) --> [tokenAssign], !.
-binary_op(<>) --> [tokenNe], !.
-binary_op(<) --> [tokenLt], !.
-binary_op(>) --> [tokenGt], !.
-binary_op(<=) --> [tokenLte], !.
-binary_op(>=) --> [tokenGte], !.
-binary_op(^) --> [tokenExp], !.
-binary_op('|') --> [tokenOr], !.
-binary_op(+) --> [tokenPlus], !.
-binary_op(-) --> [tokenMinus], !.
-binary_op(&) --> [tokenAnd], !.
-binary_op(*) --> [tokenMult], !.
-binary_op(/) --> [tokenDiv], !.
-binary_op('%') --> [tokenMod], !.
-binary_op(@) --> [tokenAt], !.
+
+% For operators associativity and priority, see description above,
+% at the beggining of the file
+binary_op_comma(',') --> [tokenComma], !.
+
+binary_op2(=) --> [tokenAssign], !.
+binary_op2(<>) --> [tokenNe], !.
+binary_op2(<) --> [tokenLt], !.
+binary_op2(>) --> [tokenGt], !.
+binary_op2(<=) --> [tokenLte], !.
+binary_op2(>=) --> [tokenGte], !.
+
+% 3_r => 3rd priority, right associativity
+binary_op3_r(@) --> [tokenAt], !.
+
+% 3_l => 3rd priority, left associativity
+binary_op3_l('|') --> [tokenPipe], !.
+binary_op3_l(^) --> [tokenCaret], !.
+binary_op3_l(+) --> [tokenPlus], !.
+binary_op3_l(-) --> [tokenMinus], !.
+
+binary_op5(&) --> [tokenAnd], !.
+binary_op5(*) --> [tokenMult], !.
+binary_op5(/) --> [tokenDiv], !.
+binary_op5('%') --> [tokenMod], !.
 
 
 unary_op(-) --> [tokenMinus], !.
@@ -285,40 +381,53 @@ unary_op(#) --> [tokenHash], !.
 unary_op(~) --> [tokenTilde], !.
 
 
+% Left Recursion
+% Part of bit_select and bits_select logic is managed in simple_expr
+
 simple_expr(Expr) -->
-    (   [tokenLParen], !, expr(Expr), [tokenRParen]
-    ;   byte_choice(Expr), !
-    ;   bytes_choice(Expr), !
-    ;   atomic_expr(Expr)
+    (   [tokenLParen], !, expr(ExprAcc), [tokenRParen],
+        simple_expr(ExprAcc, Expr)
+    ;   atomic_expr(ExprAcc),
+        simple_expr(ExprAcc, Expr)
     ).
 
+simple_expr(Acc, Expr) -->
+    bits_select(SelectExpr1, SelectExpr2), !,
+    { Acc1 = bitsel(no, Acc, SelectExpr1, SelectExpr2) },
+    simple_expr(Acc1, Expr).
 
-byte_choice(Choice) -->
-    simple_expr(SimpleExpr),
+simple_expr(Acc, Expr) -->
+    bit_select(Select),
+    { Acc1 = bitsel(no, Acc, Select) },
+    simple_expr(Acc1, Expr).
+
+simple_expr(Acc, Acc) --> [].
+
+
+bit_select(SelectExpr) -->
     [tokenLBracket],
-    expr(Expr),
-    [tokenRBracket],
-    { Choice = bitsel(no, SimpleExpr, Expr) }.
+    expr(SelectExpr),
+    [tokenRBracket].
 
-
-bytes_choice(Choice) -->
-    simple_expr(SimpleExpr),
+bits_select(SelectExpr1, SelectExpr2) -->
     [tokenLBracket],
-    expr(Expr1),
+    expr(SelectExpr1),
     [tokenDoubleDot],
-    expr(Expr2),
-    [tokenRBracket],
-    { Choice = bitsel(no, SimpleExpr, Expr1, Expr2) }.
+    expr(SelectExpr2),
+    [tokenRBracket].
 
 
 atomic_expr(Expr) -->
-    (   variable(Expr), !
-    ;   func_exec(Expr), !
-    ;   float_literal(Expr), !
+    (   func_exec(Expr), !
+    ;   variable(Expr), !
     ;   empty_vector(Expr), !
-    ;   single_bit(Expr)
+    ;   int_literal(Expr), !
+    ;   single_bit(Expr), !
     ).
 
+int_literal(IntLiteral) -->
+    [tokenNum(Num)],
+    { IntLiteral = num(no, Num) }.
 
 variable(ParsedVar) -->
     [tokenVar(Var)],
@@ -326,7 +435,7 @@ variable(ParsedVar) -->
 
 
 func_exec(Func) -->
-    identifier(Id),
+    [tokenVar(Id)],
     [tokenLParen],
     expr(Expr),
     [tokenRParen],
@@ -334,7 +443,8 @@ func_exec(Func) -->
 
 
 empty_vector(Expr) -->
-    [],
+    [tokenLBracket],
+    [tokenRBracket],
     { Expr = empty(no) }.
 
 
@@ -349,9 +459,12 @@ empty(Expr) -->
     [],
     { Expr = empty(no) }.
 
+/* Main predicate running parser
+
+Example usage:
+?- parse(_, `def main(A) = B`, Program).
+*/
 
 parse(_Path, Codes, Program) :-
     phrase(lexer(TokenList), Codes),
     phrase(program(Program), TokenList).
-
-
