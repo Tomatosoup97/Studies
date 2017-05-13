@@ -4,3 +4,6 @@ venv
 *.exe
 node_modules
 *.dll
+
+*.o
+
