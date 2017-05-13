@@ -34,7 +34,7 @@
 % UWAGA: niniejsza sprawdzaczka nie sprawdza wszystkich warunków nałożonych
 % na format testów i wyników działania programu. Zachęcamy jednak do
 % modyfikowania i ulepszania jej kodu.
-% 
+%
 % Do poprawnego działania sprawdzaczki należy jeszcze zmodyfikować
 % poniższe dwa wiersze:
 :- use_module(tests).

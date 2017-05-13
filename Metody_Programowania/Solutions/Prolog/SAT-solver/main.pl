@@ -9,7 +9,7 @@ solve(Clauses, Solution) :-
     variables(Clauses, Variables),
     \+ member([], Variables),
     format(Clauses, InternalFormat1, Variables),
-    flattenIfEmpty(InternalFormat1, InternalFormat),    
+    flattenIfEmpty(InternalFormat1, InternalFormat),
     sort_internal_list(InternalFormat, SortedInternalList),
     reduce_all_single_var_clauses(SortedInternalList, ProcessedInternalList,
                                   InitialSolution), !,
@@ -98,7 +98,7 @@ len([_|Tail], Len) :-
 
 
 %% Finding [[p], []], we can reduce all of the unnecessary values on other
-%% clauses using two techniques listed below 
+%% clauses using two techniques listed below
 %%
 reduce_all_single_var_clauses([], [], []).
 reduce_all_single_var_clauses([Head|Tail], ReducedListFinal, [Value|SolutionTail]) :-
@@ -110,7 +110,7 @@ reduce_all_single_var_clauses([Head|InternalTail], [Head|ReducedTail], Solution)
 
 
 reduce_single_var_clause(InternalElement, InternalList, ReducedListFinal, [(X, t)]) :-
-    InternalElement = [[X], []], !, 
+    InternalElement = [[X], []], !,
     eliminate_solved_clauses((X, t), InternalList, ReducedList),
     remove_negated_values((X, t), ReducedList, ReducedListFinal).
 
