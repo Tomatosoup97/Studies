@@ -1,0 +1,13 @@
+input x y z in
+let x_gt_y = x < y in
+let y_gt_z = y < z in
+
+if x_gt_y and y_gt_z then
+   let sum = x + y + z in
+   if x <> 0 then
+       let x = sum div x in
+       true - 1
+   else
+       sum + 1
+else
+   -1

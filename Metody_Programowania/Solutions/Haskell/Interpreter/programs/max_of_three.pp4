@@ -1,0 +1,7 @@
+input x y z in
+
+let max = x in
+let max = if y > max then y else max in
+let max = if z > max then z else max in
+
+max
