@@ -25,6 +25,7 @@ typeErrorMsg str = "Unsupported operand type(s) for " ++ str
 
 data Error p
     = TypeError p DataTypes.ErrorMessage
+    | ZeroDivisionError p
     deriving (Show)
 
 
@@ -40,30 +41,77 @@ extendEnv env var value = Map.insert var value env
 
 
 -- Type checker
--- ==============================================
+-- =================================================================
 
--- data BinaryOperator
---   = BAnd | BOr
---   -- Comparison operators
---   | BEq | BNeq
---   | BLt | BGt | BLe | BGe
---   -- Arithmetic operators
---   | BAdd | BSub
---   | BMul | BDiv | BMod
 
--- is_binary_op :: Environment -> BinaryOperator -> Expr e1 -> Expr e2 -> Either (Error p) Type
--- is_binary_op env op expr1 expr2
---     | is_arithmetic_op op = case
+is_logical_op :: BinaryOperator -> Bool
+is_logical_op op = any (op ==) [BAnd, BOr]
 
-is_unary_op :: Environment -> p -> UnaryOperator -> Expr e -> Either (Error p) Type
-is_unary_op env p op expr = case op of
+is_comparison_op :: BinaryOperator -> Bool
+is_comparison_op op = any (op ==) [BEq, BNeq, BLt, BGt, BLe, BGe]
+
+is_arithmetic_op :: BinaryOperator -> Bool
+is_arithmetic_op op = any (op ==) [BAdd, BSub, BMul, BDiv, BMod]
+
+
+is_binary_expr :: Environment -> BinaryOperator -> Expr p -> Expr p -> Either (Error p) Type
+is_binary_expr env op expr1 expr2
+    | is_arithmetic_op op = case infer_type env expr1 of
+        Right Integer -> case infer_type env expr2 of
+            Right Integer -> Right Integer
+            _ -> Left $ TypeError (getData expr2) (typeErrorMsg $ show op)
+        _ -> Left $ TypeError (getData expr1) (typeErrorMsg $ show op)
+
+    | is_comparison_op op  = case infer_type env expr1 of
+        Right Integer -> case infer_type env expr2 of
+            Right Integer -> Right Bool
+            _ -> Left $ TypeError (getData expr2) (typeErrorMsg $ show op)
+        _ -> Left $ TypeError (getData expr1) (typeErrorMsg $ show op)
+
+    | is_logical_op op = case infer_type env expr1 of
+        Right Bool -> case infer_type env expr2 of
+            Right Bool -> Right Bool
+            _ -> Left $ TypeError (getData expr2) (typeErrorMsg $ show op)
+        _ -> Left $ TypeError (getData expr1) (typeErrorMsg $ show op)
+
+
+is_unary_expr :: Environment -> UnaryOperator -> Expr p -> Either (Error p) Type
+is_unary_expr env op expr = case op of
     UNot -> case expr_type of
-        Right Integer -> Left $ TypeError p (typeErrorMsg "not: Integer")
+        Right Integer -> Left $ TypeError pos (typeErrorMsg $ show op)
         Right Bool -> Right Bool
     UNeg -> case expr_type of
         Right Integer -> Right Integer
-        Right Bool -> Left $ TypeError p (typeErrorMsg  "-: Boolean")
+        Right Bool -> Left $ TypeError pos (typeErrorMsg $ show op)
     where expr_type = infer_type env expr
+          pos = getData expr
+
+
+is_conditional_expr :: Environment -> Expr p -> Expr p -> Expr p -> Either (Error p) Type
+is_conditional_expr env condition ifTrueExpr elseExpr = case infer_type env condition of
+    Right Bool -> case infer_type env ifTrueExpr of
+        Right _ -> case infer_type env elseExpr of
+            Right Integer -> Right Integer
+            Right Bool -> Right Bool
+            Left (TypeError p msg) -> Left $ TypeError p msg
+        Left (TypeError p msg) -> Left $ TypeError p msg
+    Right Integer -> Left $ TypeError (getData condition) (typeErrorMsg $ "condition")
+    Left (TypeError p msg) -> Left $ TypeError p msg
+
+
+is_let_expr :: Environment -> Var -> Expr p -> Expr p -> Either (Error p) Type
+is_let_expr env var varExpr expr = case infer_type env varExpr of
+    Right Bool -> case infer_type extended_env expr of
+        Right Bool -> Right Bool
+        Right Integer -> Right Integer
+        Left (TypeError p msg) -> Left $ TypeError p msg
+        where extended_env = extendEnv env var (Boolean True)
+    Right Integer -> case infer_type extended_env expr of
+        Right Bool -> Right Bool
+        Right Integer -> Right Integer
+        Left (TypeError p msg) -> Left $ TypeError p msg
+        where extended_env = extendEnv env var (Num 1)
+    Left (TypeError p msg) -> Left $ TypeError p msg
 
 
 infer_type :: Environment -> Expr p -> Either (Error p) Type
@@ -75,92 +123,92 @@ infer_type env expr = case expr of
             Boolean b -> Right Bool
             Num b -> Right Integer
         Nothing -> Left $ TypeError p ("Unbound variable " ++ var)
-    -- EBinary p op expr1 expr2 -> is_binary_op env op expr1 expr2
-    EUnary p op expr -> is_unary_op env p op expr
-    -- ELet p var varExpr expr -> is_let_expr env var varExpr expr
-    -- EIf p condition trueExpr falseExpr ->
-    --     is_conditional_expr env condition trueExpr falseExpr
+    EBinary p op expr1 expr2 -> is_binary_expr env op expr1 expr2
+    EUnary p op expr -> is_unary_expr env op expr
+    ELet p var varExpr expr -> is_let_expr env var varExpr expr
+    EIf p condition ifTrueExpr elseExpr ->
+        is_conditional_expr env condition ifTrueExpr elseExpr
 
 
 varToEnvTuple :: Var -> (Var, Primitive)
-varToEnvTuple var = (var, Num 0)
+varToEnvTuple var = (var, Num 1)
 
 varsToEnv :: [Var] -> Environment
 varsToEnv vars = Map.fromList . map varToEnvTuple $ vars
 
 
--- Funkcja sprawdzająca typy
--- Dla wywołania typecheck vars e zakładamy, że zmienne występujące
--- w vars są już zdefiniowane i mają typ int, i oczekujemy by wyrażenia e
--- miało typ int
 typecheck :: [Var] -> Expr p -> DataTypes.TypeCheckResult p
--- typecheck vars expr = case infer_type env expr of
---     Right Integer -> DataTypes.Ok
---     Right Bool -> DataTypes.Error p "Expression should evaluate to integer!"
---     Left (TypeError p msg) -> DataTypes.Error p msg
---     where env = varsToEnv vars
---           p = getData expr
-typecheck var expr = DataTypes.Ok
+typecheck vars expr = case infer_type env expr of
+    Right Integer -> DataTypes.Ok
+    Right Bool -> DataTypes.Error p "Expression should evaluate to integer!"
+    Left (TypeError p msg) -> DataTypes.Error p msg
+    where env = varsToEnv vars
+          p = getData expr
+
 
 -- Interpreter
--- ==============================================
+-- =================================================================
 
 
-binary_op :: Environment -> BinaryOperator -> Expr e1 -> Expr e2 -> Primitive
+binary_op :: Environment -> BinaryOperator -> Expr p -> Expr p -> Either (Error p) Primitive
 binary_op env op expr1 expr2 = case op of
     -- Arithmetic operators
-    BAdd -> Num $ expr1_val + expr2_val
-    BSub -> Num $ expr1_val - expr2_val
-    BMul -> Num $ expr1_val * expr2_val
+    BAdd -> Right $ Num $ expr1_val + expr2_val
+    BSub -> Right $ Num $ expr1_val - expr2_val
+    BMul -> Right $ Num $ expr1_val * expr2_val
     BDiv -> case expr2_val of
-        0 -> error "Zero division"
-        _ -> Num $ expr1_val `div` expr2_val
-    BMod -> Num $ expr1_val `mod` expr2_val
+        0 -> Left $ ZeroDivisionError (getData expr2)
+        _ -> Right $ Num $ expr1_val `div` expr2_val
+    BMod -> Right $ Num $ expr1_val `mod` expr2_val
     -- Comparison operators
-    BEq -> Boolean $ expr1_val == expr2_val
-    BNeq -> Boolean $ expr1_val /= expr2_val
-    BLt -> Boolean $ expr1_val < expr2_val
-    BGt -> Boolean $ expr1_val > expr2_val
-    BLe -> Boolean $ expr1_val <= expr2_val
-    BGe -> Boolean $ expr1_val >= expr2_val
+    BEq -> Right $ Boolean $ expr1_val == expr2_val
+    BNeq -> Right $ Boolean $ expr1_val /= expr2_val
+    BLt -> Right $ Boolean $ expr1_val < expr2_val
+    BGt -> Right $ Boolean $ expr1_val > expr2_val
+    BLe -> Right $ Boolean $ expr1_val <= expr2_val
+    BGe -> Right $ Boolean $ expr1_val >= expr2_val
     -- Logical operators
-    BAnd -> Boolean $ expr1_val_b && expr2_val_b
-    BOr -> Boolean $ expr1_val_b || expr2_val_b
+    BAnd -> Right $ Boolean $ expr1_val_b && expr2_val_b
+    BOr -> Right $ Boolean $ expr1_val_b || expr2_val_b
     where
-    Boolean expr1_val_b = interpret env expr1
-    Boolean expr2_val_b = interpret env expr2
-    Num expr1_val = interpret env expr1
-    Num expr2_val = interpret env expr2
+    Right (Boolean expr1_val_b) = interpret env expr1
+    Right (Boolean expr2_val_b) = interpret env expr2
+    Right (Num expr1_val) = interpret env expr1
+    Right (Num expr2_val) = interpret env expr2
 
 
-unary_op :: Environment -> UnaryOperator -> Expr e -> Primitive
+unary_op :: Environment -> UnaryOperator -> Expr p -> Either (Error p) Primitive
 unary_op env op expr = case op of
-    UNeg -> Num (-expr_val) where Num expr_val = interpret env expr
-    UNot -> Boolean (not expr_val) where Boolean expr_val = interpret env expr
+    UNeg -> Right $ Num (-expr_val)
+        where Right (Num expr_val) = interpret env expr
+    UNot -> Right $ Boolean (not expr_val)
+        where Right (Boolean expr_val) = interpret env expr
 
 
-let_expr :: Environment -> Var -> Expr e1 -> Expr e2 -> Primitive
+let_expr :: Environment -> Var -> Expr p -> Expr p -> Either (Error p) Primitive
 let_expr env var var_expr expr = interpret extended_env expr
-    where var_value = interpret env var_expr
+    where Right var_value = interpret env var_expr
           extended_env = extendEnv env var var_value
 
 
-conditional_expr :: Environment -> Expr cond -> Expr trueExpr ->
-                    Expr falseExpr -> Primitive
+conditional_expr :: Environment -> Expr p -> Expr p -> Expr p -> Either (Error p) Primitive
 conditional_expr env condition_expr trueExpr falseExpr =
     if condition then
         interpret env trueExpr
     else interpret env falseExpr
-    where Boolean condition = interpret env condition_expr
+    where Right (Boolean condition) = interpret env condition_expr
 
 
 -- Main function interpreting AST
-interpret :: Environment -> Expr p -> Primitive
+interpret :: Environment -> Expr p -> Either (Error p) Primitive
 interpret env expr = case expr of
-    ENum p n -> Num n
-    EBool p b -> Boolean b
-    EVar p var -> value where Just value = lookupEnv env var
-    EBinary p op expr1 expr2 -> binary_op env op expr1 expr2
+    ENum p n -> Right $ Num n
+    EBool p b -> Right $ Boolean b
+    EVar p var -> Right value where Just value = lookupEnv env var
+    EBinary p op expr1 expr2 -> case binary_op env op expr1 expr2 of
+        Right (Boolean b) -> Right $ Boolean b
+        Right (Num n) -> Right $ Num n
+        Left (ZeroDivisionError p) -> Left $ ZeroDivisionError p
     EUnary p op expr -> unary_op env op expr
     ELet p var varExpr expr -> let_expr env var varExpr expr
     EIf p condition trueExpr falseExpr ->
@@ -178,7 +226,8 @@ inputToEnvironment input = Map.fromList . map inputTupleToEnvTuple $ input
 
 eval :: [(Var, Integer)] -> Expr p -> DataTypes.EvalResult
 eval input expr = case result of
-    Num n -> DataTypes.Value n
-    Boolean b -> DataTypes.RuntimeError
+    Right (Num n) -> DataTypes.Value n
+    Right (Boolean _) -> DataTypes.RuntimeError
+    Left _ -> DataTypes.RuntimeError
     where env = inputToEnvironment input
           result = interpret env expr

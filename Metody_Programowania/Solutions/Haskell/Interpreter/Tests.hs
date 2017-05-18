@@ -18,7 +18,7 @@ tests =
   , Test "parentheses1"         (SrcString "(30 + 3) * 4")                           (Eval [] (Value 132))
   , Test "parentheses2"         (SrcString "input x y in (x - 2) * y + x")           (Eval [4,5] (Value 14))
   , Test "should_not_overflow"  (SrcString "input x in x * x")                       (Eval [9999999999] (Value 99999999980000000001))
-  -- , Test "zero_division"        (SrcString "input x in x div 0")                     (Eval [42] RuntimeError )
+  , Test "zero_division"        (SrcString "input x in x div 0")                     (Eval [42] RuntimeError )
 
   , Test "let"                  (SrcString "let x = 12 in x + 30")                   (Eval [] (Value 42))
   , Test "let_override"         (SrcString "input x in let x = 1 in x + 1")          (Eval [42] (Value 2))
