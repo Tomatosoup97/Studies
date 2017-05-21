@@ -1,10 +1,13 @@
+{-
+-- PP4 language AST interpreter with typechecking
+-}
+
 {-# LANGUAGE Safe #-}
 module Interpreter (typecheck, eval) where
 
 import qualified Data.Map as Map
 
 import AST
-import Control.Monad
 import qualified DataTypes
 
 
@@ -58,6 +61,7 @@ typeToDummyPrimitive t = case t of
     Bool -> TBool True
 
 
+-- Convert Primitive to Type (while losing data stored in Primitive)
 primitiveToType :: Primitive -> Type
 primitiveToType p = case p of
     TBool _ -> Bool
@@ -74,6 +78,7 @@ is_arithmetic_op :: BinaryOperator -> Bool
 is_arithmetic_op op = any (op ==) [BAdd, BSub, BMul, BDiv, BMod]
 
 
+-- Get binary op types basing on operator
 binaryOpTypes :: BinaryOperator -> (Type, Type)
 binaryOpTypes op
     | is_logical_op op = (Bool, Bool)
@@ -103,17 +108,15 @@ infer_unary_expr_type env op e =
 infer_cond_expr_type :: Environment -> Expr p -> Expr p -> Expr p -> Either (Error p) Type
 infer_cond_expr_type env cond tE fE =
     infer_type env cond >>= compareTypes cond Bool >>
-    infer_type env tE >>= (\t ->
+    infer_type env tE >>= \t ->
         infer_type env fE >>= compareTypes fE t >> return t
-    )
 
 
 infer_let_expr_type :: Environment -> Var -> Expr p -> Expr p -> Either (Error p) Type
 infer_let_expr_type env var varExpr expr =
-    infer_type env varExpr >>= (\t ->
+    infer_type env varExpr >>= \t ->
         let extEnv = (extendEnv env var (typeToDummyPrimitive t)) in
-        infer_type extEnv expr >>= (\tE -> return tE)
-    )
+        infer_type extEnv expr >>= \tE -> return tE
 
 
 infer_type :: Environment -> Expr p -> Either (Error p) Type
@@ -138,6 +141,10 @@ varsToEnv :: [Var] -> Environment
 varsToEnv vars = Map.fromList . map varToEnvTuple $ vars
 
 
+{-
+-- Main function type checking expression before interpreting
+-- [Var] - list of already defined variables (Integers)
+-}
 typecheck :: [Var] -> Expr p -> DataTypes.TypeCheckResult p
 typecheck vars expr = case infer_type env expr of
     Right Integer -> DataTypes.Ok
@@ -151,66 +158,72 @@ typecheck vars expr = case infer_type env expr of
 -- =================================================================
 
 
-binary_op :: Environment -> BinaryOperator -> Expr p -> Expr p -> Either (Error p) Primitive
-binary_op env op e1 e2 = case op of
+calcBinExpr :: BinaryOperator -> p -> Primitive -> Primitive -> Either (Error p) Primitive
+calcBinExpr op p eV1 eV2 = case op of
     -- Arithmetic operators
-    BAdd -> Right $ TInt $ e1_val + e2_val
-    BSub -> Right $ TInt $ e1_val - e2_val
-    BMul -> Right $ TInt $ e1_val * e2_val
-    BDiv -> case e2_val of
-        0 -> Left $ ZeroDivisionError (getData e2)
-        _ -> Right $ TInt $ e1_val `div` e2_val
-    BMod -> case e2_val of
-        0 -> Left $ ZeroDivisionError (getData e2)
-        _ -> Right $ TInt $ e1_val `mod` e2_val
+    BDiv -> if x2 == 0 then Left $ ZeroDivisionError p
+            else            Right (TInt (x1 `div` x2))
+    BMod -> if x2 == 0 then Left $ ZeroDivisionError p
+            else            Right (TInt (x1 `mod` x2))
+    BAdd -> Right $ TInt $ x1 + x2
+    BSub -> Right $ TInt $ x1 - x2
+    BMul -> Right $ TInt $ x1 * x2
     -- Comparison operators
-    BEq -> Right $ TBool $ e1_val == e2_val
-    BNeq -> Right $ TBool $ e1_val /= e2_val
-    BLt -> Right $ TBool $ e1_val < e2_val
-    BGt -> Right $ TBool $ e1_val > e2_val
-    BLe -> Right $ TBool $ e1_val <= e2_val
-    BGe -> Right $ TBool $ e1_val >= e2_val
+    BEq -> Right $ TBool $ x1 == x2
+    BNeq -> Right $ TBool $ x1 /= x2
+    BLt -> Right $ TBool $ x1 < x2
+    BGt -> Right $ TBool $ x1 > x2
+    BLe -> Right $ TBool $ x1 <= x2
+    BGe -> Right $ TBool $ x1 >= x2
     -- Logical operators
-    BAnd -> Right $ TBool $ e1_val_b && e2_val_b
-    BOr -> Right $ TBool $ e1_val_b || e2_val_b
-    where
-    Right (TBool e1_val_b) = interpret env e1
-    Right (TBool e2_val_b) = interpret env e2
-    Right (TInt e1_val) = interpret env e1
-    Right (TInt e2_val) = interpret env e2
+    BAnd -> Right $ TBool $ x1_b && x2_b
+    BOr -> Right $ TBool $ x1_b || x2_b
+    where (TInt x1) = eV1
+          (TInt x2) = eV2
+          (TBool x1_b) = eV1
+          (TBool x2_b) = eV2
 
 
-unary_op :: Environment -> UnaryOperator -> Expr p -> Either (Error p) Primitive
-unary_op env op expr = case op of
-    UNeg -> Right $ TInt (-expr_val)
-        where Right (TInt expr_val) = interpret env expr
-    UNot -> Right $ TBool (not expr_val)
-        where Right (TBool expr_val) = interpret env expr
+interpretBinExpr :: Environment -> BinaryOperator -> Expr p -> Expr p -> Either (Error p) Primitive
+interpretBinExpr env op e1 e2 = do
+    x1 <- interpret env e1
+    x2 <- interpret env e2
+    calcBinExpr op p x1 x2
+    where p = (getData e2)
 
 
-let_expr :: Environment -> Var -> Expr p -> Expr p -> Either (Error p) Primitive
-let_expr env var var_expr expr = interpret extended_env expr
-    where Right var_value = interpret env var_expr
-          extended_env = extendEnv env var var_value
+interpretUnaryOp :: Environment -> UnaryOperator -> Expr p -> Either (Error p) Primitive
+interpretUnaryOp env op e = case op of
+    UNeg -> interpret env e >>= \(TInt x) -> return $ TInt (-x)
+    UNot -> interpret env e >>= \(TBool x) -> return $ TBool (not x)
 
 
-conditional_expr :: Environment -> Expr p -> Expr p -> Expr p -> Either (Error p) Primitive
-conditional_expr env condE tE fE =
-    if condition then interpret env tE
-    else interpret env fE
-    where Right (TBool condition) = interpret env condE
+interpretLetExpr :: Environment -> Var -> Expr p -> Expr p -> Either (Error p) Primitive
+interpretLetExpr env var var_expr expr =
+    interpret env var_expr >>= \varValue ->
+        let extEnv = extendEnv env var varValue in
+        interpret extEnv expr
 
 
--- Main function interpreting AST
+interpretCondExpr :: Environment -> Expr p -> Expr p -> Expr p -> Either (Error p) Primitive
+interpretCondExpr env condE tE fE =
+    interpret env condE >>= \(TBool condition) ->
+        if condition then interpret env tE
+        else              interpret env fE
+
+{-
+-- Interpreter function
+-- Expression result is based on passed environment
+-}
 interpret :: Environment -> Expr p -> Either (Error p) Primitive
 interpret env expr = case expr of
     ENum p n -> Right $ TInt n
     EBool p b -> Right $ TBool b
     EVar p var -> Right value where Just value = lookupEnv env var
-    EBinary p op expr1 expr2 -> binary_op env op expr1 expr2
-    EUnary p op expr -> unary_op env op expr
-    ELet p var varExpr expr -> let_expr env var varExpr expr
-    EIf p cond tE fE -> conditional_expr env cond tE fE
+    EBinary p op expr1 expr2 -> interpretBinExpr env op expr1 expr2
+    EUnary p op expr -> interpretUnaryOp env op expr
+    ELet p var varExpr expr -> interpretLetExpr env var varExpr expr
+    EIf p cond tE fE -> interpretCondExpr env cond tE fE
 
 
 -- Transform input to internal environment
@@ -222,6 +235,10 @@ inputToEnvironment :: [(Var, Integer)] -> Environment
 inputToEnvironment input = Map.fromList . map inputTupleToEnvTuple $ input
 
 
+{-
+-- Main function evaluating expression.
+-- Act as a intermediary function between actual interpreter and AST from parser
+-}
 eval :: [(Var, Integer)] -> Expr p -> DataTypes.EvalResult
 eval input expr = case result of
     Right (TInt n) -> DataTypes.Value n

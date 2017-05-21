@@ -18,11 +18,19 @@ tests =
   , Test "parentheses1"         (SrcString "(30 + 3) * 4")                           (Eval [] (Value 132))
   , Test "parentheses2"         (SrcString "input x y in (x - 2) * y + x")           (Eval [4,5] (Value 14))
   , Test "should_not_overflow"  (SrcString "input x in x * x")                       (Eval [9999999999] (Value 99999999980000000001))
-  , Test "zero_division"        (SrcString "input x in x div 0")                     (Eval [42] RuntimeError )
+
+  , Test "runTimeErrBasic"      (SrcString "input x in x div 0")                     (Eval [42] RuntimeError )
+  , Test "runTimeErrNested"     (SrcString "(1 div 0) + 1")                          (Eval [] RuntimeError )
+  , Test "runtimeErrUnary"      (SrcString "-(10 div 0)")                            (Eval [] RuntimeError)
+  , Test "runTimeErrIf"         (SrcString "if (1 div 0) <> 1 then 1 else 0")        (Eval [] RuntimeError )
+  , Test "runTimeErrLet"        (SrcString "let x = 1 div 0 in 0")                   (Eval [] RuntimeError )
+  , Test "runTimeBasicMod"      (SrcString "1 + (1 div 0)")                          (Eval [] RuntimeError )
+  , Test "runTimeLetMod"        (SrcString "let x = 1 mod 0 in 0")                   (Eval [] RuntimeError )
 
   , Test "let"                  (SrcString "let x = 12 in x + 30")                   (Eval [] (Value 42))
   , Test "let_override"         (SrcString "input x in let x = 1 in x + 1")          (Eval [42] (Value 2))
   , Test "nested_let"           (SrcString "let x = 1 in let y = 2 in x + y")        (Eval [] (Value 3))
+  , Test "let_if_boolean"       (SrcString "let x = if true then true else false in 1") (Eval [] (Value 1))
 
   , Test "if_true"              (SrcString "if true then 1 else 0")                  (Eval [] (Value 1))
   , Test "if_false"             (SrcString "if false then 1 else 0")                 (Eval [] (Value 0))
