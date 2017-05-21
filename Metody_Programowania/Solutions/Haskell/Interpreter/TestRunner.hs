@@ -1,5 +1,5 @@
 
--- Test runner do zadania 4
+-- Test runner do zadania 5
 --
 -- Pozwala zarówno sprawdzić swoje rozwiązanie na własnych
 -- testach, jak i uruchomić napisany ewaluator na dowolnym programie
@@ -92,15 +92,18 @@ main = do
       runPrograms opts fnames
     ARun opts fnames -> runPrograms opts fnames
 
-parseProgram :: SourceName -> String -> IO ([AST.Var], AST.Expr SourcePos)
+parseProgram :: SourceName -> String ->
+    IO ([AST.FunctionDef SourcePos], [AST.Var], AST.Expr SourcePos)
 parseProgram fname chars =
   case Parser.parseProgram fname chars of
-    Right (AST.Program vars body) -> do
+    Right (AST.Program fs vars body) -> do
+      checkFunctionDefUniqueness fs
       checkInputUniqueness vars
-      return (map fst vars, body)
+      return (fs, map fst vars, body)
     Left error -> ioError $ userError $ show error
 
-parseProgramFile :: SourceName -> IO ([AST.Var], AST.Expr SourcePos)
+parseProgramFile :: SourceName ->
+  IO ([AST.FunctionDef SourcePos], [AST.Var], AST.Expr SourcePos)
 parseProgramFile fname = do
   chars <- readFile fname
   parseProgram fname chars
@@ -109,10 +112,19 @@ checkInputUniqueness :: [(AST.Var, SourcePos)] -> IO ()
 checkInputUniqueness [] = return ()
 checkInputUniqueness ((x, p) : xs) =
   case find (\ (y, _) -> x == y) xs of
-    Nothing      -> checkInputUniqueness xs
-    Just (y, p') ->
+    Nothing -> checkInputUniqueness xs
+    Just _  ->
       ioError $ userError $ show p ++
         (":\nInput variable " ++ x ++ " is not unique")
+
+checkFunctionDefUniqueness :: [AST.FunctionDef SourcePos] -> IO ()
+checkFunctionDefUniqueness [] = return ()
+checkFunctionDefUniqueness (AST.FunctionDef pos name _ _ _ _ : fs) =
+  case find (\ f -> name == AST.funcName f) fs of
+    Nothing -> checkFunctionDefUniqueness fs
+    Just _  ->
+      ioError $ userError $ show pos ++
+        (":\nRedefinition of function " ++ name)
 
 runAllTests :: IO ()
 runAllTests = mapM_ runTest Tests.tests
@@ -120,8 +132,8 @@ runAllTests = mapM_ runTest Tests.tests
 runTest :: DataTypes.Test -> IO ()
 runTest (DataTypes.Test name src ans) = do
   printTestName
-  (vars, body) <- loadTestProgram src
-  case (ans, Solution.typecheck vars body) of
+  (fs, vars, body) <- loadTestProgram src
+  case (ans, Solution.typecheck fs vars body) of
     (DataTypes.TypeError, DataTypes.Ok) ->
       putStrLn "wrong type-checker answer"
     (DataTypes.TypeError, DataTypes.Error _ _) ->
@@ -129,7 +141,7 @@ runTest (DataTypes.Test name src ans) = do
     (DataTypes.Eval _ _, DataTypes.Error _ _) ->
       putStrLn "wrong type-checker answer"
     (DataTypes.Eval input res, DataTypes.Ok) ->
-      if res == Solution.eval (zip vars input) body then
+      if res == Solution.eval fs (zip vars input) body then
         putStrLn "ok"
       else
         putStrLn "wrong answer"
@@ -148,25 +160,27 @@ runPrograms opts = mapM_ $ runProgram opts
 runProgram :: Options -> SourceName -> IO ()
 runProgram opts fname =
   catches (do
-    (vars, body) <- parseProgramFile fname
-    if noTypecheck opts then return () else typecheckProgram vars body
-    if noEval      opts then return () else evalProgram vars body
+    (fs, vars, body) <- parseProgramFile fname
+    if noTypecheck opts then return () else typecheckProgram fs vars body
+    if noEval      opts then return () else evalProgram fs vars body
   )
   [ Handler (hPutStrLn stderr . ioeGetErrorString)
   , Handler (\ e -> hPutStrLn stderr $ show (e :: SomeException))
   ]
 
-typecheckProgram :: [AST.Var] -> AST.Expr SourcePos -> IO ()
-typecheckProgram vars body =
-  case Solution.typecheck vars body of
+typecheckProgram ::
+  [AST.FunctionDef SourcePos] -> [AST.Var] -> AST.Expr SourcePos -> IO ()
+typecheckProgram fs vars body =
+  case Solution.typecheck fs vars body of
     DataTypes.Ok            -> return ()
     DataTypes.Error pos msg ->
       ioError $ userError $ show pos ++ ":\n" ++ msg
 
-evalProgram :: [AST.Var] -> AST.Expr SourcePos -> IO ()
-evalProgram vars body = do
+evalProgram ::
+  [AST.FunctionDef SourcePos] -> [AST.Var] -> AST.Expr SourcePos -> IO ()
+evalProgram fs vars body = do
   input <- mapM readInput vars
-  putStrLn $ show $ Solution.eval input body
+  putStrLn $ show $ Solution.eval fs input body
   where
     readInput :: AST.Var -> IO (AST.Var, Integer)
     readInput x = do
