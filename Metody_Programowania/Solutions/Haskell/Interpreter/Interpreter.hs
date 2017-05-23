@@ -12,8 +12,12 @@ import qualified DataTypes
 
 
 data Primitive
-    = VInt Integer
+    = VUnit
+    | VNil Type
+    | VInt Integer
     | VBool Bool
+    | VPair Primitive Primitive
+    | VList [Primitive]
     deriving (Eq, Show)
 
 
@@ -45,25 +49,33 @@ typeErrorMsg :: String -> String
 typeErrorMsg str = "Unsupported operand type(s) for " ++ str
 
 
+typeError :: Expr p -> Type -> Error p
+typeError e t = TypeError (getData e) (typeErrorMsg $ show e ++ ". Expected " ++ show t)
+
+
 compareTypes :: Expr p -> Type -> Type -> Either (Error p) Type
 compareTypes e t1 t2
     | t1 == t2 = Right t2
-    | otherwise = Left $ TypeError (getData e) (typeErrorMsg $ show e ++ ". Expected " ++ show t1)
+    | otherwise = Left $ typeError e t1
 
 
 -- Convert type to dummy primitive (used in type inference environment)
-typeToDummyPrimitive :: Type -> Primitive
-typeToDummyPrimitive t = case t of
+typeToPrimitive :: Type -> Primitive
+typeToPrimitive t = case t of
     TInt -> VInt 1
     TBool -> VBool True
-
+    TUnit -> VUnit
+    TPair t1 t2 -> VPair (typeToPrimitive t1) (typeToPrimitive t2)
+    TList t -> VList [typeToPrimitive t]
 
 -- Convert Primitive to Type (while losing data stored in Primitive)
 primitiveToType :: Primitive -> Type
 primitiveToType p = case p of
     VBool _ -> TBool
     VInt _ -> TInt
-
+    VNil t -> TList t
+    VPair p1 p2 -> TPair (primitiveToType p1) (primitiveToType p2)
+    VList [p] -> TList (primitiveToType p)
 
 is_logical_op :: BinaryOperator -> Bool
 is_logical_op op = any (op ==) [BAnd, BOr]
@@ -112,8 +124,37 @@ infer_cond_expr_type env cond tE fE =
 infer_let_expr_type :: Environment -> Var -> Expr p -> Expr p -> Either (Error p) Type
 infer_let_expr_type env var varExpr expr =
     infer_type env varExpr >>= \t ->
-        let extEnv = (extendEnv env var (typeToDummyPrimitive t)) in
+        let extEnv = (extendEnv env var (typeToPrimitive t)) in
         infer_type extEnv expr >>= \tE -> return tE
+
+
+infer_pair_type :: Environment -> Expr p -> Expr p -> Either (Error p) Type
+infer_pair_type env e1 e2 =
+    infer_type env e1 >>= \t1 ->
+        infer_type env e2 >>= \t2 ->
+            compareTypes e2 t1 t2 >> return (TPair t1 t2)
+
+
+infer_cons_type :: Environment -> Expr p -> Expr p -> Either (Error p) Type
+infer_cons_type env e1 e2 =
+    infer_type env e1 >>= \t1 ->
+        infer_type env e2 >>= \t2 -> case t2 of
+            TList lT -> compareTypes e2 t1 t2 >> return (TList t2)
+            _ -> Left $ typeError e1 t2
+
+
+infer_fst_type :: Environment -> Expr p -> Either (Error p) Type
+infer_fst_type env e =
+    infer_type env e >>= \t -> case t of
+        (TPair resType _) -> Right resType
+        _ -> Left $ typeError e t
+
+
+infer_snd_type :: Environment -> Expr p -> Either (Error p) Type
+infer_snd_type env e =
+    infer_type env e >>= \t -> case t of
+        (TPair _ resType) -> Right resType
+        _ -> Left $ typeError e t
 
 
 infer_type :: Environment -> Expr p -> Either (Error p) Type
@@ -123,6 +164,12 @@ infer_type env e = case e of
     EVar p var -> case (lookupEnv env var) of
         Just val -> Right $ primitiveToType val
         Nothing -> Left $ TypeError p ("Unbound variable " ++ var)
+    EUnit p -> Right TUnit
+    EPair p e1 e2 -> infer_pair_type env e1 e2
+    ENil p t -> Right $ TList t
+    EFst p e -> infer_fst_type env e
+    ESnd p e -> infer_snd_type env e
+    ECons p e1 e2 -> infer_cons_type env e1 e2
     EBinary p op e1 e2 -> infer_binary_expr_type env op e1 e2
     EUnary p op e -> infer_unary_expr_type env op e
     ELet p var varExpr e -> infer_let_expr_type env var varExpr e
@@ -216,6 +263,18 @@ interpret :: FuncSymTab p -> Environment -> Expr p -> Either (Error p) Primitive
 interpret fs env expr = case expr of
     ENum p n -> Right $ VInt n
     EBool p b -> Right $ VBool b
+    EUnit p -> Right VUnit
+    ENil p t -> Right $ VNil t
+    ECons p e1 e2 ->
+        interpret fs env e1 >>= \x ->
+            interpret fs env e2 >>= \xs -> case xs of
+                VList xs -> return $ VList (x:xs)
+                VNil _ -> return $ VList [x]
+    EPair p e1 e2 ->
+        interpret fs env e1 >>= \x1 ->
+            interpret fs env e2 >>= \x2 -> return $ VPair x1 x2
+    EFst p e -> interpret fs env e >>= \(VPair x1 _) -> return x1
+    ESnd p e -> interpret fs env e >>= \(VPair _ x2) -> return x2
     EVar p var -> Right value where Just value = lookupEnv env var
     EBinary p op expr1 expr2 -> interpretBinExpr fs env op expr1 expr2
     EUnary p op expr -> interpretUnaryOp fs env op expr
