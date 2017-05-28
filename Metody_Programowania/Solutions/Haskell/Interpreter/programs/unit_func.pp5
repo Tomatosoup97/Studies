@@ -1,0 +1,8 @@
+fun unitFunc(x : unit * (int * bool)) : int =
+    if snd (snd x) then
+        fst (snd x)
+    else -1
+
+input x in unitFunc(
+    ( (), (x, true) )
+)

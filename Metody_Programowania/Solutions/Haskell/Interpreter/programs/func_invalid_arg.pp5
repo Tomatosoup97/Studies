@@ -1,0 +1,5 @@
+fun boolToInt (x : bool) : int =
+    if x then 1
+    else 0
+
+input x in boolToInt(x)

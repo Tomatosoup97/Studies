@@ -1,0 +1,22 @@
+fun head (x : (int * bool) list) : int * bool =
+    match x with
+        | [] -> ()
+        | a :: as -> a
+
+fun zip (x : int list * bool list) : (int * bool) list =
+    match fst x with
+    | [] -> []: (int * bool) list
+    | a :: as ->  match snd x with
+      | [] -> []: (int * bool) list
+      | b :: bs -> (a, b) :: zip (as, bs)
+
+
+input x in
+fst (
+  head (
+    zip ((
+      [42, 2, 3]: int,
+      [true, false, false]: bool
+    ))
+  )
+)

@@ -1,0 +1,6 @@
+fun head (x : int list) : int =
+    match x with
+        | [] -> 0
+        | a :: as -> a
+
+input x in x + head([2, 3, 4]: int)
