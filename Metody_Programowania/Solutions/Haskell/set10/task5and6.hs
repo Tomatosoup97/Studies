@@ -7,7 +7,7 @@ class Monoid' a where
     e :: a
 
 infixl 7 ***
-infixl 6 ^^^
+infixr 6 ^^^
 
 (^^^) :: Monoid' a => a -> Integer -> a
 a ^^^ 0 = e

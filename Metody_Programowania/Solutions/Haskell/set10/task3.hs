@@ -9,3 +9,8 @@ merge_unique (x:xs) (y:ys)
 
 d235 :: [Integer]
 d235 = 1 : merge_unique (map (2*) d235) (merge_unique (map (3*) d235) (map (5*) d235))
+
+-- Alternative
+
+d235' :: [Integer]
+d235' = 1 : foldl1 merge_unique [ map (n *) d235 | n <- [2, 3, 5]]
