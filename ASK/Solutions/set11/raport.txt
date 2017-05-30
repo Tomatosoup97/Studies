@@ -1,0 +1,74 @@
+v0 - wersja podstawowa
+v1 - wersja zoptymalizowana
+
+
+Zadanie 1:
+=========
+
+Transpose
+
+
+1. matrix 32768 x 32768 (4194304 KiB):
+
+  v0: Time elapsed: 18.060138 seconds.
+
+  Block size 128:
+  v1: Time elapsed: 5.460008 seconds.
+
+
+  Block size 64:
+  v1: Time elapsed: 6.767804 seconds.
+
+
+  Block size 32:
+  v1: Time elapsed: 2.404515 seconds.
+
+
+  Block size 16:
+  v1: Time elapsed: 4.552894 seconds.
+
+
+2. matrix 16384 x 16384 (1048576 KiB)
+
+  Block size 64
+  v0: Time elapsed: 6.499523 seconds
+  v1: Time elapsed: 1.978466 seconds
+
+
+3. matrix 4096 x 4096 (65536 KiB)
+
+  Block size 64
+  v0: Time elapsed: 0.350504 seconds.
+  v1: Time elapsed: 0.096065 seconds.
+
+
+Optimized: up to ~90% faster
+
+
+Zadanie 2:
+==========
+
+Randwalk
+
+
+1. matrix Time elapsed: 3.441331 seconds.
+  16384 random walks of 65536 steps
+
+  v0: Time elapsed: 7.536156 seconds.
+  v1: Time elapsed: 3.441331 seconds.
+
+
+2. matrix 32 x 32 (1 KiB)
+  65536 random walks of 65536 steps.
+
+  v0: Time elapsed: 29.434339 seconds.
+  v1: Time elapsed: 13.723185 seconds.
+
+
+3. matrix 16384 x 16384 (262144 KiB)
+  16 random walks of 1073741824 steps.
+
+  v0: Time elapsed: 126.840762 seconds.
+  v1: Time elapsed: 64.629755 seconds.
+
+Optimized: up to ~54 % faster
