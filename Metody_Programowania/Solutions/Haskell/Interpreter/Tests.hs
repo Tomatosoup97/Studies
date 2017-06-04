@@ -79,40 +79,43 @@ tests =
   -- PP5 Tests
   -- =================
 
-  , Test "nil"                  (SrcString "let x = []: int in 1")                                (Eval [] (Value (1)))
-  , Test "cons"                 (SrcString "let x = 1 :: []: int in 1")                           (Eval [] (Value (1)))
-  , Test "cons_long"            (SrcString "let x = 1 :: 2 :: 3 :: 4 :: []: int in 1")            (Eval [] (Value (1)))
-  , Test "cons_bool"            (SrcString "let x = (true :: [] : bool) in 1")                    (Eval [] (Value (1)))
-  , Test "listSyntSugar"        (SrcString "let x = [1, 2, 3, 4]: int in 1")                      (Eval [] (Value (1)))
-  , Test "list_bools"           (SrcString "let x = [true, false]: int in 1")                     (Eval [] (Value (1)))
+  , Test "nil"                  (SrcString "let x = []: int list in 1")                                (Eval [] (Value (1)))
+  , Test "cons"                 (SrcString "let x = 1 :: []: int list in 1")                           (Eval [] (Value (1)))
+  , Test "cons_long"            (SrcString "let x = 1 :: 2 :: 3 :: 4 :: []: int list in 1")            (Eval [] (Value (1)))
+  , Test "cons_bool"            (SrcString "let x = (true :: []: bool list) in 1")                     (Eval [] (Value (1)))
+  , Test "listSyntSugar"        (SrcString "let x = [1, 2, 3, 4]: int list in 1")                      (Eval [] (Value (1)))
+  , Test "list_bools"           (SrcString "let x = [true, false]: bool list in 1")                    (Eval [] (Value (1)))
 
-  , Test "unit"                 (SrcString "let x = () in 1")                                     (Eval [] (Value (1)))
-  , Test "tuple"                (SrcString "let x = (1, 2) in 1")                                 (Eval [] (Value (1)))
-  , Test "fst"                  (SrcString "let x = (1, 2) in fst x")                             (Eval [] (Value (1)))
-  , Test "snd"                  (SrcString "let x = (1, 2) in snd x")                             (Eval [] (Value (2)))
-  , Test "fst_complex"          (SrcString "if fst (true, false) then 1 else 0")                  (Eval [] (Value (1)))
-  , Test "expr_in_pair"         (SrcString "fst (10 + 2 * 3, 1)")                                 (Eval [] (Value (16)))
-  , Test "snd_complex"          (SrcString "let x = snd (1, 2) in x + 2")                         (Eval [] (Value (4)))
-  , Test "nested_tuples"        (SrcString "fst (fst ((1, 2), (3, 4)))")                          (Eval [] (Value (1)))
-  , Test "deeply_nested"        (SrcString "snd (fst (snd (((1, 2), (3, 4)), ((5, 6), (7, 8)))))") (Eval [] (Value (6)))
+  , Test "unit"                 (SrcString "let x = () in 1")                                          (Eval [] (Value (1)))
+  , Test "tuple"                (SrcString "let x = (1, 2) in 1")                                      (Eval [] (Value (1)))
+  , Test "fst"                  (SrcString "let x = (1, 2) in fst x")                                  (Eval [] (Value (1)))
+  , Test "fst_mix"              (SrcString "let x = (1, true) in fst x")                               (Eval [] (Value (1)))
+  , Test "snd"                  (SrcString "let x = (1, 2) in snd x")                                  (Eval [] (Value (2)))
+  , Test "fst_complex"          (SrcString "if fst (true, false) then 1 else 0")                       (Eval [] (Value (1)))
+  , Test "expr_in_pair"         (SrcString "fst (10 + 2 * 3, 1)")                                      (Eval [] (Value (16)))
+  , Test "snd_complex"          (SrcString "let x = snd (1, 2) in x + 2")                              (Eval [] (Value (4)))
+  , Test "nested_tuples"        (SrcString "fst (fst ((1, 2), (3, 4)))")                               (Eval [] (Value (1)))
+  , Test "deeply_nested"        (SrcString "snd (fst (snd (((1, 2), (3, 4)), ((5, 6), (7, 8)))))")     (Eval [] (Value (6)))
 
-  , Test "matchNil"             (SrcString "match []:int with [] -> 1 | x :: xs -> 0")            (Eval [] (Value (1)))
-  , Test "matchCons"            (SrcString "match 1 :: []: int with [] -> 0 | x :: xs -> 1")      (Eval [] (Value (1)))
-  , Test "matchUseVars"         (SrcString "match 9 :: []: int with [] -> 0 | x :: xs -> x")      (Eval [] (Value (9)))
-  , Test "matchList"            (SrcString "match [1, 2]: int with [] -> 1 | x :: xs -> x")       (Eval [] (Value (1)))
-  , Test "matchFst"             (SrcString "match fst([1]: int, [0]: int) with [] -> 0 | x :: xs -> x") (Eval [] (Value (1)))
+  , Test "matchNil"             (SrcString "match []:int list with [] -> 1 | x :: xs -> 0")            (Eval [] (Value (1)))
+  , Test "matchCons"            (SrcString "match 1 :: []: int list with [] -> 0 | x :: xs -> 1")      (Eval [] (Value (1)))
+  , Test "matchUseVars"         (SrcString "match 9 :: []: int list with [] -> 0 | x :: xs -> x")      (Eval [] (Value (9)))
+  , Test "matchList"            (SrcString "match [1, 2]: int list with [] -> 1 | x :: xs -> x")       (Eval [] (Value (1)))
+  , Test "matchFst"             (SrcString "match fst([1]: int list, [0]: int list) with [] -> 0 | x :: xs -> x") (Eval [] (Value (1)))
 
-  , Test "runTimeFst"           (SrcString "fst (1 div 0, 1)")                                    (Eval [] RuntimeError )
-  , Test "runTimeGreedy"        (SrcString "fst (1, 1 div 0)")                                    (Eval [] RuntimeError )
-  , Test "runTimeMatch"         (SrcString "match [0, 1]: int with [] -> 0 | x :: xs -> x div 0") (Eval [] RuntimeError )
-  , Test "runTimeFunction"      (SrcString "fun zeroDiv(x: int) : int = x div 0 in zeroDiv(1)")   (Eval [] RuntimeError )
+  , Test "runTimeFst"           (SrcString "fst (1 div 0, 1)")                                         (Eval [] RuntimeError )
+  , Test "runTimeGreedy"        (SrcString "fst (1, 1 div 0)")                                         (Eval [] RuntimeError )
+  , Test "runTimeMatch"         (SrcString "match [0, 1]: int list with [] -> 0 | x :: xs -> x div 0") (Eval [] RuntimeError )
+  , Test "runTimeMatch2"        (SrcString "match [1 div 0, 1]: int list with [] -> 0 | x :: xs -> x") (Eval [] RuntimeError )
+  , Test "runTimeFunction"      (SrcString "fun zeroDiv(x: int) : int = x div 0 in zeroDiv(1)")        (Eval [] RuntimeError )
 
   -- Test PP5 type checker
 
-  , Test "mult_lists"           (SrcString "let x = [1]: int in let y = [2]: int in x + y")       TypeError
-  , Test "fstList"              (SrcString "fst [1, 2]: int")                                     TypeError
-  , Test "cons_not_list"        (SrcString "let x = 1 :: 2 :: [] : int in x")                     TypeError
-  , Test "list_diff_types"      (SrcString "let x = [1, true]: int in 1")                         TypeError
+  , Test "mult_lists"           (SrcString "let x = [1]: int in let y = [2]: int list in x + y")  TypeError
+  , Test "fstList"              (SrcString "fst [1, 2]: int list")                                TypeError
+  , Test "cons_not_list"        (SrcString "let x = 1 :: 2 :: [] : int list in x")                TypeError
+  , Test "list_diff_types"      (SrcString "let x = [1, true]: int list in 1")                    TypeError
+  , Test "list_diff_types2"     (SrcString "let x = [1, 2, 3, 4, true]:int list in 1")            TypeError
   , Test "add_unit"             (SrcString "() + 1")                                              TypeError
   , Test "add_tuple"            (SrcString "(1, 2) + (3, 4)")                                     TypeError
   , Test "snd_add_bool"         (SrcString "let x = snd (true, false) in x + 2")                  TypeError
@@ -126,7 +129,6 @@ tests =
 
   , Test "fib"                  (SrcFile "programs/fib.pp5")                                      (Eval [6] (Value (8)))
   , Test "head"                 (SrcFile "programs/head.pp5")                                     (Eval [3] (Value (5)))
-  , Test "zip"                  (SrcFile "programs/zip.pp5")                                      (Eval [1] (Value (42)))
   , Test "unitFunc"             (SrcFile "programs/unit_func.pp5")                                (Eval [42] (Value (42)))
 
   ]

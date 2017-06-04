@@ -33,9 +33,12 @@ type Environment = Map.Map Var Primitive
 
 type FuncTabRecord p = (Primitive -> Either (Error p) Primitive)
 
-type FuncTypeTabRecord p = (Type -> Either (Error p) Type)
 
 type FuncSymTab p = Map.Map FSym (FuncTabRecord p)
+
+-- Symbol table for types
+
+type FuncTypeTabRecord p = (Type -> Either (Error p) Type)
 
 type FuncTypeSymTab p = Map.Map FSym (FuncTypeTabRecord p)
 
@@ -87,6 +90,7 @@ typeToPrimitive t = case t of
 primitiveToType :: Primitive -> Type
 primitiveToType p = case p of
     VBool _ -> TBool
+    VUnit -> TUnit
     VInt _ -> TInt
     VNil t -> TList t
     VPair p1 p2 -> TPair (primitiveToType p1) (primitiveToType p2)
@@ -134,42 +138,39 @@ infer_cond_expr_type :: FuncTypeSymTab p -> Environment -> Expr p -> Expr p -> E
 infer_cond_expr_type fs env cond tE fE =
     infer_type fs env cond >>= compareTypes cond TBool >>
     infer_type fs env tE >>= \t ->
-        infer_type fs env fE >>= compareTypes fE t >> return t
+        infer_type fs env fE >>= compareTypes fE t
 
 
 infer_let_expr_type :: FuncTypeSymTab p -> Environment -> Var -> Expr p -> Expr p -> Either (Error p) Type
 infer_let_expr_type fs env var varExpr expr =
     infer_type fs env varExpr >>= \t ->
         let extEnv = (extendEnv env var (typeToPrimitive t)) in
-        infer_type fs extEnv expr >>= \tE -> return tE
+        infer_type fs extEnv expr
 
 
 infer_pair_type :: FuncTypeSymTab p -> Environment -> Expr p -> Expr p -> Either (Error p) Type
 infer_pair_type fs env e1 e2 =
     infer_type fs env e1 >>= \t1 ->
-        infer_type fs env e2 >>= \t2 ->
-            compareTypes e2 t1 t2 >> return (TPair t1 t2)
+        infer_type fs env e2 >>= \t2 -> return (TPair t1 t2)
 
 
 infer_cons_type :: FuncTypeSymTab p -> Environment -> Expr p -> Expr p -> Either (Error p) Type
-infer_cons_type fs env e1 e2 =
-    infer_type fs env e1 >>= \t1 ->
-        infer_type fs env e2 >>= \t2 -> case t2 of
-            TList lT -> compareTypes e2 t1 lT >> return (TList t2)
-            _ -> Left $ typeError e1 t2
+infer_cons_type fs env xE xsE =
+    infer_type fs env xE >>= \xT ->
+        infer_type fs env xsE >>= compareTypes xsE (TList xT)
 
 
 infer_fst_type :: FuncTypeSymTab p -> Environment -> Expr p -> Either (Error p) Type
 infer_fst_type fs env e =
     infer_type fs env e >>= \t -> case t of
-        (TPair resType _) -> Right resType
+        (TPair resType _) -> return resType
         _ -> Left $ typeError e t
 
 
 infer_snd_type :: FuncTypeSymTab p -> Environment -> Expr p -> Either (Error p) Type
 infer_snd_type fs env e =
     infer_type fs env e >>= \t -> case t of
-        (TPair _ resType) -> Right resType
+        (TPair _ resType) -> return resType
         _ -> Left $ typeError e t
 
 
@@ -177,12 +178,10 @@ infer_match_type :: FuncTypeSymTab p -> Environment -> Expr p -> NilClause p -> 
 infer_match_type fs env e (nilE) (xVar, xsVar, consE) =
     infer_type fs env e >>= \t -> case t of
         TList lT ->
-            compareTypes e (TList lT) t >>
             infer_type fs env nilE >>= \nT ->
-                 -- TODO: is it correct? return cT or nT ?
                 let extEnvTmp = extendEnv env xVar (typeToPrimitive lT) in
                 let extEnv = extendEnv extEnvTmp xsVar (typeToPrimitive t) in
-                infer_type fs env consE >>= \cT -> return nT
+                infer_type fs extEnv consE >>= compareTypes e nT
         _ -> Left $ typeError e t
 
 
@@ -194,14 +193,14 @@ infer_func_app_type fs env fsym e = case lookupTypeSymTab fs fsym of
 
 infer_type :: FuncTypeSymTab p -> Environment -> Expr p -> Either (Error p) Type
 infer_type fs env e = case e of
-    ENum p n -> Right TInt
-    EBool p b -> Right TBool
+    ENum p n -> return TInt
+    EBool p b -> return TBool
     EVar p var -> case (lookupEnv env var) of
-        Just val -> Right $ primitiveToType val
+        Just val -> return $ primitiveToType val
         Nothing -> Left $ TypeError p ("Unbound variable " ++ var)
-    EUnit p -> Right TUnit
+    EUnit p -> return TUnit
     EPair p e1 e2 -> infer_pair_type fs env e1 e2
-    ENil p t -> Right $ TList t
+    ENil p t -> return t
     EFst p e -> infer_fst_type fs env e
     ESnd p e -> infer_snd_type fs env e
     ECons p e1 e2 -> infer_cons_type fs env e1 e2
@@ -222,35 +221,44 @@ varsToEnv :: [Var] -> Environment
 varsToEnv vars = Map.fromList . map varToEnvTuple $ vars
 
 
+-- Convert function defs to internal function symbol table for types.
+-- It creates Map containing tuples (fsym, \arg -> resType), where function
+-- check against argument type and thne return func result type
 funcToTypeSymTab :: [FunctionDef p] -> FuncTypeSymTab p
-funcToTypeSymTab fs =
-    let funEnv = Map.fromList (map
+funcToTypeSymTab fs = Map.fromList $ map toSymTabRecord fs
+    where toSymTabRecord =
             (\f -> (funcName f,
-                    -- TODO: it is lazy
-                    \argT -> let env = Map.fromList [(funcArg f, (typeToPrimitive argT))] in
-                             let e = funcBody f in
-                             compareTypes e argT (funcArgType f)-- >>
-                             -- infer_type funEnv env e >>=
-                                -- compareTypes e (funcResType f)
-                    ) --TODO
-            ) fs)
-    in funEnv
+               \argT -> compareTypes (funcBody f) (funcArgType f) argT >>
+                        return (funcResType f)
+            ))
+
+
+type_check_func :: FuncTypeSymTab p -> FunctionDef p -> Either (Error p) Type
+type_check_func fSymTab f =
+    infer_type fSymTab env (funcBody f) >>= compareTypes (funcBody f) (funcResType f)
+    where env = Map.fromList [(funcArg f, (typeToPrimitive (funcArgType f)))]
+
+-- Recursively iterate over function definitions and type check them
+type_check_funcs :: [FunctionDef p] -> FuncTypeSymTab p -> Either (Error p) Type
+type_check_funcs [] _ = Right TInt
+type_check_funcs (f:fdefs) fSymTab =
+    type_check_func fSymTab f >> type_check_funcs fdefs fSymTab
 
 
 {-
--- Main function type checking expression before interpreting
+-- Main function type checking expression before interpretation
 -- [Var] - list of already defined variables (integers)
 -}
 typecheck :: [FunctionDef p] -> [Var] -> Expr p -> DataTypes.TypeCheckResult p
-typecheck fs vars expr = case infer_type fSymTab env expr of
-    Right TInt -> DataTypes.Ok
-    Right TBool -> DataTypes.Error p "Expression should evaluate to integer!"
-    Left (TypeError p msg) -> DataTypes.Error p msg
-    where env = varsToEnv vars
-          -- TODO: any(fSymTab) == Left err => Left err
-          fSymTab = funcToTypeSymTab fs
-          p = getData expr
--- typecheck fs vars expr = DataTypes.Ok
+typecheck fs vars expr =
+    case (type_check_funcs fs fSymTab, infer_type fSymTab env expr) of
+        (Left (TypeError p msg), _) -> DataTypes.Error p msg
+        (_, Right TInt) -> DataTypes.Ok
+        (_, Right _) -> DataTypes.Error p "Expression should evaluate to integer!"
+        (_, Left (TypeError p msg)) -> DataTypes.Error p msg
+        where env = varsToEnv vars
+              fSymTab = funcToTypeSymTab fs
+              p = getData expr
 
 
 -- Interpreter
@@ -319,14 +327,6 @@ interpretCons fs env e1 e2 =
             VNil _ -> return $ VList [x]
             VInt i -> Left $ ZeroDivisionError (getData e1)
 
-            -- VPair p1 p2 -> Left $ ZeroDivisionError (getData e1)
-            -- VUnit -> Left $ ZeroDivisionError (getData e1)
-            -- VNil t -> Left $ ZeroDivisionError (getData e1)
-            -- VInt i -> Left $ ZeroDivisionError (getData e1)
-            -- VBool b -> Left $ ZeroDivisionError (getData e1)
-            -- VPair p1 p2 -> Left $ ZeroDivisionError (getData e1)
-            -- VList [Primitive] -> Left $ ZeroDivisionError (getData e1) ]
-
 
 interpretPair :: FuncSymTab p -> Environment -> Expr p -> Expr p -> Either (Error p) Primitive
 interpretPair fs env e1 e2 =
@@ -338,11 +338,11 @@ interpretMatchExpr :: FuncSymTab p -> Environment -> Expr p -> NilClause p -> Co
 interpretMatchExpr fs env e (nilE) (xVar, xsVar, consE) =
     interpret fs env e >>= \val -> case val of
         VNil _ -> interpret fs env nilE
+        VList ([]) -> interpret fs env nilE
         VList (x:xs) ->
             let extEnvTmp = extendEnv env xVar x in
             let extEnv = extendEnv extEnvTmp xsVar (VList xs) in
             interpret fs extEnv consE
-        VList ([]) -> interpret fs env nilE
 
 
 interpretFuncApp :: FuncSymTab p -> Environment -> FSym -> Expr p -> Either (Error p) Primitive
@@ -357,15 +357,15 @@ interpretFuncApp fs env fsym e =
 -}
 interpret :: FuncSymTab p -> Environment -> Expr p -> Either (Error p) Primitive
 interpret fs env expr = case expr of
-    ENum p n -> Right $ VInt n
-    EBool p b -> Right $ VBool b
-    EUnit p -> Right VUnit
-    ENil p t -> Right $ VNil t
+    ENum p n -> return $ VInt n
+    EBool p b -> return $ VBool b
+    EUnit p -> return VUnit
+    ENil p t -> return $ VNil t
     ECons p e1 e2 -> interpretCons fs env e1 e2
     EPair p e1 e2 -> interpretPair fs env e1 e2
     EFst p e -> interpret fs env e >>= \(VPair x1 _) -> return x1
     ESnd p e -> interpret fs env e >>= \(VPair _ x2) -> return x2
-    EVar p var -> Right value where Just value = lookupEnv env var
+    EVar p var -> return value where Just value = lookupEnv env var
     EBinary p op expr1 expr2 -> interpretBinExpr fs env op expr1 expr2
     EUnary p op expr -> interpretUnaryOp fs env op expr
     ELet p var varExpr expr -> interpretLetExpr fs env var varExpr expr

@@ -3,4 +3,4 @@ fun head (x : int list) : int =
         | [] -> 0
         | a :: as -> a
 
-input x in x + head([2, 3, 4]: int)
+input x in x + head([2, 3, 4]: int list)
