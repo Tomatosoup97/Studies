@@ -22,6 +22,34 @@ data Primitive p
     | VLambda (Environment p) (FuncRecord p)
 
 
+-- Internal type used in type checker
+data (IType p)
+  = TInt'
+  | TBool'
+  | TUnit'
+  | TPair' (IType p) (IType p)
+  | TList' (IType p)
+  | TArrow' (IType p) (IType p)
+  | TClosure' (FuncTypeRecord p)
+
+
+instance Eq (IType p) where
+    TInt' == TInt' = True
+    TBool' == TBool' = True
+    TUnit' == TUnit' = True
+    TPair' t1 t2 == TPair' t1' t2' = t1 == t1' && t2 == t2'
+    TList' t1 == TList' t2 = t1 == t2
+    TArrow' _ _ == TArrow' _ _ = True
+    TClosure' _ == TClosure' _ = True
+    _ == _ = False
+
+
+
+instance Show (IType p) where
+    show (TClosure' _) = "TClosure"
+    show t = show t
+
+
 data Error p
     = TypeError p DataTypes.ErrorMessage
     | ZeroDivisionError p
@@ -30,20 +58,13 @@ data Error p
 
 type Environment p = Map.Map Var (Primitive p)
 
+type TypeEnvironment p = Map.Map Var (IType p)
+
 -- Function definitions stored in symbol table
 
 type FuncRecord p = ((Primitive p) -> Either (Error p) (Primitive p))
 
-
--- Symbol table for types
-
-type FuncTypeTabRecord p = (Type -> Either (Error p) Type)
-
-type FuncTypeSymTab p = Map.Map Var (FuncTypeTabRecord p)
-
-
-lookupTypeSymTab :: FuncTypeSymTab p -> Var -> Maybe (FuncTypeTabRecord p)
-lookupTypeSymTab fs fsym = Map.lookup fsym fs
+type FuncTypeRecord p = ((IType p) -> Either (Error p) (IType p))
 
 
 lookupEnv :: Environment p -> Var -> Maybe (Primitive p)
@@ -51,6 +72,13 @@ lookupEnv env x = Map.lookup x env
 
 extendEnv :: Environment p -> Var -> Primitive p -> (Environment p)
 extendEnv env var value = Map.insert var value env
+
+
+lookupTypeEnv :: TypeEnvironment p -> Var -> Maybe (IType p)
+lookupTypeEnv env x = Map.lookup x env
+
+extendTypeEnv :: TypeEnvironment p -> Var -> IType p -> TypeEnvironment p
+extendTypeEnv env var value = Map.insert var value env
 
 
 -- Type checker
@@ -61,35 +89,25 @@ typeErrorMsg :: String -> String
 typeErrorMsg str = "Unsupported operand type(s) for " ++ str
 
 
-typeError :: Expr p -> Type -> Error p
+typeError :: Expr p -> (IType p) -> Error p
 typeError e t = TypeError (getData e) (typeErrorMsg $ show e ++ ". Expected " ++ show t)
 
 
-compareTypes :: Expr p -> Type -> Type -> Either (Error p) Type
+compareTypes :: Expr p -> (IType p) -> (IType p) -> Either (Error p) (IType p)
 compareTypes e t1 t2
     | t1 == t2 = Right t2
     | otherwise = Left $ typeError e t1
 
 
--- Convert type to dummy primitive (used in type inference environment)
-typeToPrimitive :: Type -> (Primitive p)
-typeToPrimitive t = case t of
-    TInt -> VInt 1
-    TBool -> VBool True
-    TUnit -> VUnit
-    TPair t1 t2 -> VPair (typeToPrimitive t1) (typeToPrimitive t2)
-    TList t -> VList [typeToPrimitive t]
-
-
--- Convert Primitive to Type (while losing data stored in Primitive)
-primitiveToType :: (Primitive p) -> Type
-primitiveToType p = case p of
-    VBool _ -> TBool
-    VUnit -> TUnit
-    VInt _ -> TInt
-    VNil t -> TList t
-    VPair p1 p2 -> TPair (primitiveToType p1) (primitiveToType p2)
-    VList [p] -> TList (primitiveToType p)
+-- Convert type to internal type
+typeToIType :: Type -> (IType p)
+typeToIType t = case t of
+    TInt -> TInt'
+    TBool -> TBool'
+    TUnit -> TUnit'
+    TPair t1 t2 -> TPair' (typeToIType t1) (typeToIType t2)
+    TList t -> TList' (typeToIType t)
+    TArrow t1 t2 -> TArrow' (typeToIType t1) (typeToIType t2)
 
 
 is_logical_op :: BinaryOperator -> Bool
@@ -103,19 +121,19 @@ is_arithmetic_op op = any (op ==) [BAdd, BSub, BMul, BDiv, BMod]
 
 
 -- Get binary op types basing on operator
-binaryOpTypes :: BinaryOperator -> (Type, Type)
+binaryOpTypes :: BinaryOperator -> ((IType p), (IType p))
 binaryOpTypes op
-    | is_logical_op op = (TBool, TBool)
-    | is_comparison_op op = (TInt, TBool)
-    | is_arithmetic_op op = (TInt, TInt)
+    | is_logical_op op = (TBool', TBool')
+    | is_comparison_op op = (TInt', TBool')
+    | is_arithmetic_op op = (TInt', TInt')
 
 
-unaryOpTypes :: UnaryOperator -> (Type, Type)
-unaryOpTypes UNot = (TBool, TBool)
-unaryOpTypes UNeg = (TInt, TInt)
+unaryOpTypes :: UnaryOperator -> ((IType p), (IType p))
+unaryOpTypes UNot = (TBool', TBool')
+unaryOpTypes UNeg = (TInt', TInt')
 
 
-infer_binary_expr_type :: Environment p -> BinaryOperator -> Expr p -> Expr p -> Either (Error p) Type
+infer_binary_expr_type :: TypeEnvironment p -> BinaryOperator -> Expr p -> Expr p -> Either (Error p) (IType p)
 infer_binary_expr_type env op e1 e2 =
     infer_type env e1 >>= compareTypes e1 expType >>
     infer_type env e2 >>= compareTypes e2 expType >>
@@ -123,90 +141,89 @@ infer_binary_expr_type env op e1 e2 =
     where (expType, resType) = binaryOpTypes op
 
 
-infer_unary_expr_type :: Environment p -> UnaryOperator -> Expr p -> Either (Error p) Type
+infer_unary_expr_type :: TypeEnvironment p -> UnaryOperator -> Expr p -> Either (Error p) (IType p)
 infer_unary_expr_type env op e =
     infer_type env e >>= compareTypes e expType >> return resType
     where (expType, resType) = unaryOpTypes op
 
 
-infer_cond_expr_type :: Environment p -> Expr p -> Expr p -> Expr p -> Either (Error p) Type
+infer_cond_expr_type :: TypeEnvironment p -> Expr p -> Expr p -> Expr p -> Either (Error p) (IType p)
 infer_cond_expr_type env cond tE fE =
-    infer_type env cond >>= compareTypes cond TBool >>
+    infer_type env cond >>= compareTypes cond TBool' >>
     infer_type env tE >>= \t ->
         infer_type env fE >>= compareTypes fE t
 
 
-infer_let_expr_type :: Environment p -> Var -> Expr p -> Expr p -> Either (Error p) Type
+infer_let_expr_type :: TypeEnvironment p -> Var -> Expr p -> Expr p -> Either (Error p) (IType p)
 infer_let_expr_type env var varExpr expr =
     infer_type env varExpr >>= \t ->
-        let extEnv = (extendEnv env var (typeToPrimitive t)) in
+        let extEnv = (extendTypeEnv env var t) in
         infer_type extEnv expr
 
 
-infer_pair_type :: Environment p -> Expr p -> Expr p -> Either (Error p) Type
+infer_pair_type :: TypeEnvironment p -> Expr p -> Expr p -> Either (Error p) (IType p)
 infer_pair_type env e1 e2 =
     infer_type env e1 >>= \t1 ->
-        infer_type env e2 >>= \t2 -> return (TPair t1 t2)
+        infer_type env e2 >>= \t2 -> return (TPair' t1 t2)
 
 
-infer_cons_type :: Environment p -> Expr p -> Expr p -> Either (Error p) Type
+infer_cons_type :: TypeEnvironment p -> Expr p -> Expr p -> Either (Error p) (IType p)
 infer_cons_type env xE xsE =
     infer_type env xE >>= \xT ->
-        infer_type env xsE >>= compareTypes xsE (TList xT)
+        infer_type env xsE >>= compareTypes xsE (TList' xT)
 
 
-infer_fst_type :: Environment p -> Expr p -> Either (Error p) Type
+infer_fst_type :: TypeEnvironment p -> Expr p -> Either (Error p) (IType p)
 infer_fst_type env e =
     infer_type env e >>= \t -> case t of
-        (TPair resType _) -> return resType
+        (TPair' resType _) -> return resType
         _ -> Left $ typeError e t
 
 
-infer_snd_type :: Environment p -> Expr p -> Either (Error p) Type
+infer_snd_type :: TypeEnvironment p -> Expr p -> Either (Error p) (IType p)
 infer_snd_type env e =
     infer_type env e >>= \t -> case t of
-        (TPair _ resType) -> return resType
+        (TPair' _ resType) -> return resType
         _ -> Left $ typeError e t
 
 
-infer_match_type :: Environment p -> Expr p -> NilClause p -> ConsClause p -> Either (Error p) Type
+infer_match_type :: TypeEnvironment p -> Expr p -> NilClause p -> ConsClause p -> Either (Error p) (IType p)
 infer_match_type env e (nilE) (xVar, xsVar, consE) =
     infer_type env e >>= \t -> case t of
-        TList lT ->
+        TList' lT ->
             infer_type env nilE >>= \nT ->
-                let extEnvTmp = extendEnv env xVar (typeToPrimitive lT) in
-                let extEnv = extendEnv extEnvTmp xsVar (typeToPrimitive t) in
+                let extEnvTmp = extendTypeEnv env xVar lT in
+                let extEnv = extendTypeEnv extEnvTmp xsVar t in
                 infer_type extEnv consE >>= compareTypes e nT
         _ -> Left $ typeError e t
 
 
-infer_func_app_type :: Environment p -> Expr p -> Expr p -> Either (Error p) Type
+infer_func_app_type :: TypeEnvironment p -> Expr p -> Expr p -> Either (Error p) (IType p)
 infer_func_app_type env fE argE = case fE of
-    EVar p var -> case (lookupEnv env var) of
-        Just (VClosure cloEnv func) ->
-            infer_type env argE >>= \argT -> func (typeToPrimitive argT) >>= return . primitiveToType
+    EVar p var -> case (lookupTypeEnv env var) of
+        Just (TClosure' func) -> infer_type env argE >>= func
         _ -> invalidFuncApp
     _ -> invalidFuncApp
     where invalidFuncApp =
             Left $ TypeError (getData fE) ("Invalid function application" ++ show fE)
 
 
-infer_lambda_type :: Environment p -> Var -> Type -> Expr p -> Either (Error p) Type
+infer_lambda_type :: TypeEnvironment p -> Var -> (IType p) -> Expr p -> Either (Error p) (IType p)
 infer_lambda_type cloEnv var t fE =
-    let extCloEnv = extendEnv cloEnv var (typeToPrimitive t)
-    in infer_type extCloEnv fE >>= \fT -> return $ TArrow t fT
+    let extCloEnv = extendTypeEnv cloEnv var t
+    in infer_type extCloEnv fE >>= \fT -> return $ TArrow' t fT
 
 
-infer_type :: Environment p -> Expr p -> Either (Error p) Type
+infer_type :: TypeEnvironment p -> Expr p -> Either (Error p) (IType p)
 infer_type env e = case e of
-    ENum p n -> return TInt
-    EBool p b -> return TBool
-    EVar p var -> case (lookupEnv env var) of
-        Just val -> return $ primitiveToType val
+    ENum p n -> return TInt'
+    EBool p b -> return TBool'
+    EVar p var -> case (lookupTypeEnv env var) of
+        Just val -> return val
         Nothing -> Left $ TypeError p ("Unbound variable " ++ var)
-    EUnit p -> return TUnit
+    EUnit p -> return TUnit'
     EPair p e1 e2 -> infer_pair_type env e1 e2
-    ENil p t -> return t
+    ENil p t -> return (typeToIType t)
     EFst p e -> infer_fst_type env e
     ESnd p e -> infer_snd_type env e
     ECons p e1 e2 -> infer_cons_type env e1 e2
@@ -216,44 +233,42 @@ infer_type env e = case e of
     ELet p var varExpr e -> infer_let_expr_type env var varExpr e
     EIf p cond tE fE -> infer_cond_expr_type env cond tE fE
     EApp p e1 e2 -> infer_func_app_type env e1 e2
-    EFn p var t fE -> infer_lambda_type env var t fE
-
-
--- Convert variable list to environment
-
-varToEnvTuple :: Var -> (Var, (Primitive p))
-varToEnvTuple var = (var, VInt 1)
-
-varsToEnv :: [Var] -> Environment p
-varsToEnv vars = Map.fromList . map varToEnvTuple $ vars
+    EFn p var t fE -> infer_lambda_type env var (typeToIType t) fE
 
 
 -- Convert function defs to environment.
 -- It creates Map containing tuples (fsym, \arg -> resType), where function
 -- check against argument type and thne return func result
-funcsToEnv :: [FunctionDef p] -> Environment p
+funcsToEnv :: [FunctionDef p] -> TypeEnvironment p
 funcsToEnv fs = Map.fromList $ map toSymTabRecord fs
     where toSymTabRecord =
-            (\f -> (funcName f, let emptyEnv = (Map.fromList []) in
-                    VClosure emptyEnv
-                        (\arg ->  compareTypes (funcBody f) (funcArgType f)
-                                               (primitiveToType arg) >>
-                                  return (typeToPrimitive $ funcResType f))
+            (\f -> (funcName f, TClosure'
+                   (\argT -> let funcArgT = typeToIType (funcArgType f)
+                                 funcResT = typeToIType (funcResType f) in
+                             compareTypes (funcBody f) funcArgT argT >>
+                             return funcResT)
             ))
 
 
-type_check_func :: Environment p -> FunctionDef p -> Either (Error p) Type
+type_check_func :: TypeEnvironment p -> FunctionDef p -> Either (Error p) (IType p)
 type_check_func fSymTab f =
-    infer_type env (funcBody f) >>= compareTypes (funcBody f) (funcResType f)
-    where varEnv = Map.fromList [(funcArg f, (typeToPrimitive (funcArgType f)))]
+    infer_type env (funcBody f) >>= compareTypes (funcBody f) funcResT
+    where funcArgT = typeToIType (funcArgType f)
+          funcResT = typeToIType (funcResType f)
+          varEnv = Map.fromList [(funcArg f, funcArgT)]
           env = Map.union fSymTab varEnv
 
 -- Recursively iterate over function definitions and type check them
-type_check_funcs :: [FunctionDef p] -> Environment p -> Either (Error p) Type
-type_check_funcs [] _ = Right TInt
+type_check_funcs :: [FunctionDef p] -> TypeEnvironment p -> Either (Error p) (IType p)
+type_check_funcs [] _ = Right TInt'
 type_check_funcs (f:fdefs) fSymTab =
     type_check_func fSymTab f >> type_check_funcs fdefs fSymTab
 
+
+-- Convert variable list to environment
+
+varsToEnv :: [Var] -> TypeEnvironment p
+varsToEnv vars = Map.fromList . map (\var -> (var, TInt')) $ vars
 
 {-
 -- Main function type checking expression before interpretation
@@ -263,13 +278,13 @@ typecheck :: [FunctionDef p] -> [Var] -> Expr p -> DataTypes.TypeCheckResult p
 typecheck fs vars expr =
     case (type_check_funcs fs fSymTab, infer_type env expr) of
         (Left (TypeError p msg), _) -> DataTypes.Error p msg
-        (_, Right TInt) -> DataTypes.Ok
-        (_, Right _) -> DataTypes.Error p "Expression should evaluate to integer!"
+        (_, Right TInt') -> DataTypes.Ok
+        (_, Right _) -> DataTypes.Error (getData expr) "Expression should evaluate to integer!"
         (_, Left (TypeError p msg)) -> DataTypes.Error p msg
         where varEnv = varsToEnv vars
               fSymTab = funcsToEnv fs
               env = Map.union varEnv fSymTab
-              p = getData expr
+-- typecheck fs vars expr = DataTypes.Ok
 
 
 -- Interpreter
