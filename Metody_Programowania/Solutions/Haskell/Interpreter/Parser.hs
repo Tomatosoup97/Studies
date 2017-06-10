@@ -16,9 +16,9 @@ lang = emptyDef
   , commentEnd      = "*)"
   , nestedComments  = True
   , reservedNames   =
-    [ "and", "bool", "div", "elif", "else", "false", "fst", "fun", "if", "in"
-    , "input", "int", "let", "list", "match", "mod", "not", "or", "snd", "then"
-    , "true", "unit", "with"
+    [ "and", "bool", "div", "elif", "else", "false", "fn", "fst", "fun", "if"
+    , "in", "input", "int", "let", "list", "match", "mod", "not", "or", "snd"
+    , "then", "true", "unit", "with"
     ]
   , reservedOpNames =
     [ "|", ",", ":", "->", "::"
@@ -39,6 +39,7 @@ kwDiv   = keyword "div"
 kwElif  = keyword "elif"
 kwElse  = keyword "else"
 kwFalse = keyword "false"
+kwFn    = keyword "fn"
 kwFst   = keyword "fst"
 kwFun   = keyword "fun"
 kwIf    = keyword "if"
@@ -102,12 +103,6 @@ preambleVar :: Parser (Var,SourcePos)
 preambleVar =
   (\ pos x -> (x,pos)) <$> getPosition <*> ident
 
-programFunctions :: Parser [FunctionDef SourcePos]
-programFunctions = choice
-  [ many1 functionDef <* kwIn
-  , return []
-  ] <?> "function definitions"
-
 functionDef :: Parser (FunctionDef SourcePos)
 functionDef =
   mkFunctionDef
@@ -123,10 +118,13 @@ functionDef =
 
 typeExpr :: Parser Type
 typeExpr =
-  (buildPairType <$> appTypeExpr `sepBy1` opAster) <?> "type"
+  (buildArrowType <$> pairTypeExpr `sepBy1` opArrow) <?> "type"
   where
-    buildPairType = foldr1 TPair
-    buildListType = foldl (\ t _ -> TList t)
+    buildArrowType = foldr1 TArrow
+    buildPairType  = foldr1 TPair
+    buildListType  = foldl (\ t _ -> TList t)
+
+    pairTypeExpr = buildPairType <$> appTypeExpr `sepBy1` opAster
 
     appTypeExpr = buildListType <$> simpleTypeExpr <*> many kwList
 
@@ -141,6 +139,7 @@ expr :: Parser (Expr SourcePos)
 expr = choice
   [ letExpr
   , ifExpr
+  , fnExpr
   , matchExpr
   , opExpr
   ] <?> "expression"
@@ -159,6 +158,12 @@ ifExpr =
       , EIf <$> getPosition <*>
         (kwElif *> expr) <*> (kwThen *> expr) <*> ifExprCont
       ]
+
+fnExpr :: Parser (Expr SourcePos)
+fnExpr =
+  (uncurry . EFn) <$> getPosition
+    <*> (kwFn *> parens tokenParser ((,) <$> ident <*> (opColon *> typeExpr)))
+    <*> (opArrow *> expr)
 
 matchExpr :: Parser (Expr SourcePos)
 matchExpr =
@@ -221,15 +226,15 @@ consExpr p = parser where
   buildCons e1 (Just e2) = ECons (getData e1) e1 e2
 
 appExpr :: Parser (Expr SourcePos)
-appExpr = choice
-  [ varExpr <$> getPosition <*> ident <*> (optionMaybe simpleExpr)
-  , EFst <$> getPosition <*> (kwFst *> simpleExpr)
-  , ESnd <$> getPosition <*> (kwSnd *> simpleExpr)
-  , simpleExpr
-  ]
+appExpr =
+  buildApp <$> getPosition <*> appHead <*> many simpleExpr
   where
-    varExpr pos x Nothing  = EVar pos x
-    varExpr pos f (Just e) = EApp pos f e
+    appHead = choice
+      [ EFst <$> getPosition <*> (kwFst *> simpleExpr)
+      , ESnd <$> getPosition <*> (kwSnd *> simpleExpr)
+      , simpleExpr
+      ]
+    buildApp pos = foldl (EApp pos)
 
 simpleExpr :: Parser (Expr SourcePos)
 simpleExpr = choice

@@ -3,7 +3,6 @@ module AST where
 
 -- Variables
 type Var  = String
-type FSym = String
 
 -- Types
 data Type
@@ -12,18 +11,19 @@ data Type
   | TUnit
   | TPair Type Type
   | TList Type
+  | TArrow Type Type
   deriving (Eq)
 
 data UnaryOperator
-  = UNot -- Unary not
-  | UNeg -- Unary minus
+  = UNot
+  | UNeg
   deriving (Eq)
 
 data BinaryOperator
   = BAnd | BOr
   -- Comparison operators
   | BEq | BNeq
-  | BLt | BGt | BLe | BGe -- Operators < > <= >-
+  | BLt | BGt | BLe | BGe
   -- Arithmetic operators
   | BAdd | BSub
   | BMul | BDiv | BMod
@@ -37,7 +37,8 @@ data Expr p
   | EBinary p BinaryOperator (Expr p) (Expr p) -- Wyrażenie operatorowe
   | ELet    p Var (Expr p) (Expr p)            -- Wyrażenie let
   | EIf     p (Expr p) (Expr p) (Expr p)       -- Wyrażenie warunkowe
-  | EApp    p FSym (Expr p)                    -- Aplikacja funkcji
+  | EFn     p Var Type (Expr p)                -- Lambda-abstrakcja
+  | EApp    p (Expr p) (Expr p)                -- Aplikacja
   | EUnit   p                                  -- Wyrażenie ()
   | EPair   p (Expr p) (Expr p)                -- Konstruktor pary
   | EFst    p (Expr p)                         -- Pierwsza projekcja pary
@@ -52,12 +53,13 @@ data Expr p
 type NilClause  p = Expr p
 
 -- Klauzula dla listy niepustej
--- (x, y, e) oznacza "| x :: y -> e"
+-- (x, xs, e) oznacza "| x :: xs -> e"
 type ConsClause p = (Var, Var, Expr p)
 
+-- Definicja funkcji
 data FunctionDef p = FunctionDef
   { funcPos     :: p
-  , funcName    :: FSym   -- Nazwa funkcji
+  , funcName    :: Var    -- Nazwa funkcji
   , funcArg     :: Var    -- Argument formalny
   , funcArgType :: Type   -- Typ argumentu
   , funcResType :: Type   -- Typ wyniku
@@ -83,7 +85,8 @@ updateData f (EUnary  p op e)     = EUnary  (f p) op e
 updateData f (EBinary p op e1 e2) = EBinary (f p) op e1 e2
 updateData f (ELet    p x  e1 e2) = ELet    (f p) x  e1 e2
 updateData f (EIf     p e1 e2 e3) = EIf     (f p) e1 e2 e3
-updateData f (EApp    p ff e)     = EApp    (f p) ff e
+updateData f (EFn     p x tp e)   = EFn     (f p) x tp e
+updateData f (EApp    p e1 e2)    = EApp    (f p) e1 e2
 updateData f (EUnit   p)          = EUnit   (f p)
 updateData f (EPair   p e1 e2)    = EPair   (f p) e1 e2
 updateData f (EFst    p  e)       = EFst    (f p) e
@@ -103,6 +106,7 @@ getData (EUnary  p _ _)   = p
 getData (EBinary p _ _ _) = p
 getData (ELet    p _ _ _) = p
 getData (EIf     p _ _ _) = p
+getData (EFn     p _ _ _) = p
 getData (EApp    p _ _)   = p
 getData (EUnit   p)       = p
 getData (EPair   p _ _)   = p
@@ -113,12 +117,14 @@ getData (ECons   p _ _)   = p
 getData (EMatchL p _ _ _) = p
 
 instance Show Type where
-  showsPrec _ TInt          = showString "int"
-  showsPrec _ TBool         = showString "bool"
-  showsPrec _ TUnit         = showString "unit"
-  showsPrec p (TPair t1 t2) =
-    showParen (p > 0) (showsPrec 1 t1 . showString " * " . showsPrec 0 t2)
-  showsPrec _ (TList t)     = showsPrec 1 t . showString " list"
+  showsPrec _ TInt           = showString "int"
+  showsPrec _ TBool          = showString "bool"
+  showsPrec _ TUnit          = showString "unit"
+  showsPrec p (TPair t1 t2)  =
+    showParen (p > 10) (showsPrec 11 t1 . showString " * " . showsPrec 10 t2)
+  showsPrec _ (TList t)      = showsPrec 20 t . showString " list"
+  showsPrec p (TArrow t1 t2) =
+    showParen (p > 0) (showsPrec 1 t1 . showString " -> " . showsPrec 0 t2)
 
 instance Show UnaryOperator where
   show UNot = "not"
@@ -188,9 +194,14 @@ instance Show (Expr p) where
         . showsPrec 0 e2 . showElse e3
       showElse e = showString " else " . showsPrec 0 e
 
-  showsPrec p (EApp _ ff e) =
+  showsPrec p (EFn _ x tp e) =
+    showParen (p > 0)
+      (showString "fn (" . showString x . showString " : "
+      . shows tp . showString ") -> " . showsPrec 0 e)
+
+  showsPrec p (EApp _ e1 e2) =
     showParen (p > 100)
-      (showString ff . showString " " . showsPrec 101 e)
+      (showsPrec 100 e1 . showString " " . showsPrec 101 e2)
 
   showsPrec _ (EUnit _) = showString "()"
 

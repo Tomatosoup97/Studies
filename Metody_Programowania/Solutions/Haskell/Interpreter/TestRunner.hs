@@ -1,5 +1,4 @@
-
--- Test runner do zadania 5
+-- Test runner do zadania 6
 --
 -- Pozwala zarówno sprawdzić swoje rozwiązanie na własnych
 -- testach, jak i uruchomić napisany ewaluator na dowolnym programie
@@ -7,25 +6,25 @@
 -- Aby uruchomić swoje rozwiązanie na testach należy uruchomić program
 -- z flagą -t:
 --
--- $ ./Prac4 -t
+-- $ ./Prac6 -t
 --
 -- Aby uruchomić ewaluator na przygotowanym pliku z programem, przekazujemy
--- ścieżkę do pliku (np. example.pp4) do sprawdzaczki:
+-- ścieżkę do pliku (np. example.pp6) do sprawdzaczki:
 --
--- $ ./Prac4 example.pp4
+-- $ ./Prac6 example.pp6
 --
 -- Dodatkowo flagi -u oraz -d pozwalają wyłączyć sprawdzanie typów
 -- i ewaluacje programu. Zatem można
 --
 -- * uruchomić program bez sprawdzania typów:
---   $ ./Prac4 -u example.pp4
+--   $ ./Prac6 -u example.pp6
 -- * sprawdzić typy bez uruchamiania programu:
---   $ ./Prac4 -d example.pp4
+--   $ ./Prac6 -d example.pp6
 -- * tylko sparsować program:
---   $ ./Prac4 -u -d example.pp4
+--   $ ./Prac6 -u -d example.pp6
 {-# LANGUAGE Safe #-}
 
-import qualified Tests
+import qualified Tests       as Tests
 import qualified Interpreter as Solution
 
 import System.Console.GetOpt
@@ -52,7 +51,7 @@ options =
   , Option ['h'] ["help"] (NoArg Help) "display this list of options"
   ]
 
-usageHeader = "Usage: Prac4 [OPTION...] files..."
+usageHeader = "Usage: Prac6 [OPTION...] files..."
 
 data Options = Options
   { noTypecheck :: Bool
@@ -97,10 +96,11 @@ parseProgram :: SourceName -> String ->
 parseProgram fname chars =
   case Parser.parseProgram fname chars of
     Right (AST.Program fs vars body) -> do
-      checkFunctionDefUniqueness fs
-      checkInputUniqueness vars
+      checkGlobalUniqueness (funcVars fs ++ vars)
       return (fs, map fst vars, body)
     Left error -> ioError $ userError $ show error
+  where
+    funcVars = map$ \ fd -> (AST.funcName fd, AST.funcPos fd)
 
 parseProgramFile :: SourceName ->
   IO ([AST.FunctionDef SourcePos], [AST.Var], AST.Expr SourcePos)
@@ -108,23 +108,14 @@ parseProgramFile fname = do
   chars <- readFile fname
   parseProgram fname chars
 
-checkInputUniqueness :: [(AST.Var, SourcePos)] -> IO ()
-checkInputUniqueness [] = return ()
-checkInputUniqueness ((x, p) : xs) =
+checkGlobalUniqueness :: [(AST.Var, SourcePos)] -> IO ()
+checkGlobalUniqueness [] = return ()
+checkGlobalUniqueness ((x, p) : xs) =
   case find (\ (y, _) -> x == y) xs of
-    Nothing -> checkInputUniqueness xs
+    Nothing -> checkGlobalUniqueness xs
     Just _  ->
       ioError $ userError $ show p ++
-        (":\nInput variable " ++ x ++ " is not unique")
-
-checkFunctionDefUniqueness :: [AST.FunctionDef SourcePos] -> IO ()
-checkFunctionDefUniqueness [] = return ()
-checkFunctionDefUniqueness (AST.FunctionDef pos name _ _ _ _ : fs) =
-  case find (\ f -> name == AST.funcName f) fs of
-    Nothing -> checkFunctionDefUniqueness fs
-    Just _  ->
-      ioError $ userError $ show pos ++
-        (":\nRedefinition of function " ++ name)
+        (":\nRedefinition of global variable " ++ x)
 
 runAllTests :: IO ()
 runAllTests = mapM_ runTest Tests.tests
