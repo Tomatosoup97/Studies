@@ -1,0 +1,8 @@
+fun funcListHeadOrId (funcsList: (int -> int) list): (int -> int) =
+    match funcsList with
+        | [] -> (fn (x: int) -> x)
+        | x :: xs -> x
+
+input x in (funcListHeadOrId
+        [(fn (x: int) -> x + 5), (fn (x: int) -> x + 10)] : (int -> int) list
+    ) x

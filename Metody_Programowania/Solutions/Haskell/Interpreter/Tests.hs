@@ -6,8 +6,7 @@ import DataTypes
 tests :: [Test]
 tests =
 
-  -- Test Interpreter
-  -- =================
+  -- Test PP4 Interpreter
 
   [ Test "inc"                  (SrcString "input x in x + 1")                       (Eval [42] (Value 43))
   , Test "binary_op_add"        (SrcString "42 + 17")                                (Eval [] (Value 59))
@@ -46,32 +45,30 @@ tests =
 
   , Test "boolean_var"          (SrcString "let x = true in if x then 1 else 0")     (Eval [] (Value 1))
   , Test "boolean_var2"         (SrcString "let x = 1 <> 2 in if x then 1 else 0")   (Eval [] (Value 1))
+  , Test "varsOverlap"          (SrcString "let x = 5 in let x = true in if x then 1 else 0") (Eval [] (Value 1))
 
   , Test "comment"              (SrcString "input x (* comment *) in x")             (Eval [42] (Value (42)))
 
-  -- Test Type checker
-  -- =================
+  -- Test PP4 Type checker
 
-  , Test "varsOverlap"          (SrcString "let x = 5 in let x = true in if x then 1 else 0") (Eval [] (Value 1))
-  , Test "undefVar"             (SrcString "x")                                                   TypeError
-  , Test "minusBool"            (SrcString "if -true then 1 else 0")                              TypeError
-  , Test "mod_bool"             (SrcString "let x = true in if x then x mod 2 else 0")            TypeError
+  , Test "mod_bool"             (SrcString "let x = true in if x then x mod 2 else 0") TypeError
+  , Test "undefVar"             (SrcString "x")                                      TypeError
+  , Test "minusBool"            (SrcString "if -true then 1 else 0")                 TypeError
 
-  , Test "notInteger"           (SrcString "if not 1 then 1 else 0")                              TypeError
-  , Test "orInteger"            (SrcString "if 1 or 2 then 1 else 0")                             TypeError
-  , Test "and_op_numbers"       (SrcString "if 1 and 2 then 1 else 0")                            TypeError
-  , Test "if_result"            (SrcString "if true then true else false")                        TypeError
+  , Test "notInteger"           (SrcString "if not 1 then 1 else 0")                 TypeError
+  , Test "orInteger"            (SrcString "if 1 or 2 then 1 else 0")                TypeError
+  , Test "and_op_numbers"       (SrcString "if 1 and 2 then 1 else 0")               TypeError
+  , Test "if_result"            (SrcString "if true then true else false")           TypeError
 
-  , Test "let_bool"             (SrcString "let x = true in x + 1")                               TypeError
-  , Test "int_input"            (SrcString "input x in if x then 1 else 0")                       TypeError
+  , Test "let_bool"             (SrcString "let x = true in x + 1")                  TypeError
+  , Test "int_input"            (SrcString "input x in if x then 1 else 0")          TypeError
 
-  , Test "compare_bool_gt"      (SrcString "if true > false then 1 else 0")                       TypeError
-  , Test "compare_bool_gte"     (SrcString "if true >= false then 1 else 0")                      TypeError
+  , Test "compare_bool_gt"      (SrcString "if true > false then 1 else 0")          TypeError
+  , Test "compare_bool_gte"     (SrcString "if true >= false then 1 else 0")         TypeError
 
-  , Test "complex_check"        (SrcFile "programs/program_typeerror.pp5")                        TypeError
+  , Test "complex_check"        (SrcFile "programs/program_typeerror.pp5")           TypeError
 
-  -- Integration tests with more complex pp5 programs
-  -- =================
+  -- Integration tests with more complex pp4 programs
 
   , Test "complex_program"      (SrcFile "programs/program.pp5") (Eval [1, 2, 3] (Value (5)))
   , Test "max_of_three"         (SrcFile "programs/max_of_three.pp5") (Eval [17, 42, 20] (Value (42)))
@@ -111,24 +108,52 @@ tests =
 
   -- Test PP5 type checker
 
-  , Test "mult_lists"           (SrcString "let x = [1]: int in let y = [2]: int list in x + y")  TypeError
-  , Test "fstList"              (SrcString "fst [1, 2]: int list")                                TypeError
-  , Test "cons_not_list"        (SrcString "let x = 1 :: 2 :: [] : int list in x")                TypeError
-  , Test "list_diff_types"      (SrcString "let x = [1, true]: int list in 1")                    TypeError
-  , Test "list_diff_types2"     (SrcString "let x = [1, 2, 3, 4, true]:int list in 1")            TypeError
-  , Test "add_unit"             (SrcString "() + 1")                                              TypeError
-  , Test "add_tuple"            (SrcString "(1, 2) + (3, 4)")                                     TypeError
-  , Test "snd_add_bool"         (SrcString "let x = snd (true, false) in x + 2")                  TypeError
-  , Test "match_pair"           (SrcString "match (1, 2) with [] -> e1 | x :: xs -> x")           TypeError
-  , Test "match_bool"           (SrcString "match true with [] -> e1 | x :: xs -> x")             TypeError
+  , Test "mult_lists"           (SrcString "let x = [1]: int in let y = [2]: int list in x + y")       TypeError
+  , Test "fstList"              (SrcString "fst [1, 2]: int list")                                     TypeError
+  , Test "cons_not_list"        (SrcString "let x = 1 :: 2 :: [] : int list in x")                     TypeError
+  , Test "list_diff_types"      (SrcString "let x = [1, true]: int list in 1")                         TypeError
+  , Test "list_diff_types2"     (SrcString "let x = [1, 2, 3, 4, true]:int list in 1")                 TypeError
+  , Test "add_unit"             (SrcString "() + 1")                                                   TypeError
+  , Test "add_tuple"            (SrcString "(1, 2) + (3, 4)")                                          TypeError
+  , Test "snd_add_bool"         (SrcString "let x = snd (true, false) in x + 2")                       TypeError
+  , Test "match_pair"           (SrcString "match (1, 2) with [] -> e1 | x :: xs -> x")                TypeError
+  , Test "match_bool"           (SrcString "match true with [] -> e1 | x :: xs -> x")                  TypeError
 
-  , Test "func_invalid_arg"     (SrcFile "programs/func_invalid_arg.pp5")                         TypeError
-  , Test "invalid_res_type"     (SrcFile "programs/invalid_res_type.pp5")                         TypeError
+  , Test "func_invalid_arg"     (SrcFile "programs/func_invalid_arg.pp5")                              TypeError
+  , Test "invalid_res_type"     (SrcFile "programs/invalid_res_type.pp5")                              TypeError
 
   -- Programs
 
-  , Test "fib"                  (SrcFile "programs/fib.pp5")                                      (Eval [6] (Value (8)))
-  , Test "head"                 (SrcFile "programs/head.pp5")                                     (Eval [3] (Value (5)))
-  , Test "unitFunc"             (SrcFile "programs/unit_func.pp5")                                (Eval [42] (Value (42)))
+  , Test "fib"                  (SrcFile "programs/fib.pp5")                                           (Eval [6] (Value (8)))
+  , Test "head"                 (SrcFile "programs/head.pp5")                                          (Eval [3] (Value (5)))
+  , Test "unitFunc"             (SrcFile "programs/unit_func.pp5")                                     (Eval [42] (Value (42)))
 
+  -- PP6 Tests
+  -- =================
+
+  -- HOF = High Order Function
+
+  , Test "HOF"                  (SrcString "fun add (x: int) : int = x + 5 in let x = add in 2")       (Eval [] (Value (2)))
+  , Test "HOF_usage"            (SrcString "fun add (x: int) : int = x + 5 in let x = add in x(2)")    (Eval [] (Value (7)))
+  , Test "lambda"               (SrcString "let x = fn(x: int) -> x + 5 in x(5)")                      (Eval [] (Value (10)))
+  , Test "lambda2"              (SrcString "(fn(x: int) -> x + 5) 11")                                 (Eval [] (Value (16)))
+  , Test "nestedLambda"         (SrcString "(fn(x: int) -> (fn(y: int) ->  x + y)) 5 3")               (Eval [] (Value (8)))
+  , Test "pairOfLambdas"        (SrcString "fst ((fn(x: int) -> x + 2), (fn(x: int) -> x + 4)) 2")     (Eval [] (Value (4)))
+  , Test "lambdaRunTime"        (SrcString "let foo = fn(x: int) -> x div 0 in foo(10)")               (Eval [] RuntimeError )
+  , Test "ifLambda"             (SrcString "input x in (if x <> 0 then fn(x:int) -> x + 5 else fn(x:int) -> x + 2) x") (Eval [1] (Value 6))
+
+  -- From file
+  , Test "closures"             (SrcFile "programs/closures.pp5")                                      (Eval [5] (Value (16)))
+  , Test "lambdaInFunc"         (SrcFile "programs/lambdaInFunc.pp5")                                  (Eval [10] (Value (15)))
+  , Test "lambdaAsArg"          (SrcFile "programs/lambdaAsArg.pp5")                                   (Eval [3] (Value (11)))
+  , Test "listOfLambdas"        (SrcFile "programs/listOfLambdas.pp5")                                 (Eval [1] (Value (6)))
+
+  -- Test PP6 type checker
+
+  , Test "HOF_add"              (SrcString "fun id (x : int) : int = x in let x = id in x + x")        TypeError
+  , Test "lambdaUnboundVar"     (SrcString "let foo = fn(x: int) -> x + z in foo(10)")                 TypeError
+  , Test "lambdaInvArg"         (SrcString "let foo = fn(x: bool) -> 1 in foo(1)")                     TypeError
+  , Test "nameCollision"        (SrcString "fun f(x : int): int = x input x in let f = x in f f")      TypeError
+  , Test "returnLambda"         (SrcString "fn(x:int) -> x + 1")                                       TypeError
+  , Test "lambdaArgInvType"     (SrcFile   "programs/lambdaArgInvType.pp5")                            TypeError
   ]

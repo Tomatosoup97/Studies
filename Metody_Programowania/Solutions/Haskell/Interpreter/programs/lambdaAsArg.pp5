@@ -1,0 +1,4 @@
+fun add5(f:int -> int): (int -> int) =
+    fn(x:int) -> f x + 5
+
+input y in add5 (fn(x: int) -> x * 2) y

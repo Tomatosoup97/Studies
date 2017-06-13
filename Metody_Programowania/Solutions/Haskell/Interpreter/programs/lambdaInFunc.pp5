@@ -1,0 +1,5 @@
+fun add5 (x : int) : int =
+    let add = fn (y: int) -> x + y in
+    add (5)
+
+input x in add5(x)

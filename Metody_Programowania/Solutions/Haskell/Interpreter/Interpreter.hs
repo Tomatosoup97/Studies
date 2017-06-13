@@ -18,7 +18,7 @@ data Primitive p
     | VBool Bool
     | VPair (Primitive p) (Primitive p)
     | VList [Primitive p]
-    | VClosure (Environment p) (FuncRecord p)
+    | VClosure (FuncRecord p)
     | VLambda (Environment p) (FuncRecord p)
 
 
@@ -39,10 +39,9 @@ instance Eq (IType p) where
     TUnit' == TUnit' = True
     TPair' t1 t2 == TPair' t1' t2' = t1 == t1' && t2 == t2'
     TList' t1 == TList' t2 = t1 == t2
-    TArrow' _ _ == TArrow' _ _ = True
+    TArrow' t1 t2 == TArrow' t1' t2' = t1 == t1' && t2 == t2'
     TClosure' _ == TClosure' _ = True
     _ == _ = False
-
 
 
 instance Show (IType p) where
@@ -199,13 +198,11 @@ infer_match_type env e (nilE) (xVar, xsVar, consE) =
 
 
 infer_func_app_type :: TypeEnvironment p -> Expr p -> Expr p -> Either (Error p) (IType p)
-infer_func_app_type env fE argE = case fE of
-    EVar p var -> case (lookupTypeEnv env var) of
-        Just (TClosure' func) -> infer_type env argE >>= func
-        _ -> invalidFuncApp
-    _ -> invalidFuncApp
-    where invalidFuncApp =
-            Left $ TypeError (getData fE) ("Invalid function application" ++ show fE)
+infer_func_app_type env fE argE =
+    infer_type env fE >>= \fT -> case fT of
+        (TClosure' func) -> infer_type env argE >>= func
+        (TArrow' t1 t2) -> infer_type env argE >>= compareTypes argE t1 >> return t2
+        _ -> Left $ TypeError (getData fE) ("Invalid function application" ++ show fE)
 
 
 infer_lambda_type :: TypeEnvironment p -> Var -> (IType p) -> Expr p -> Either (Error p) (IType p)
@@ -284,7 +281,6 @@ typecheck fs vars expr =
         where varEnv = varsToEnv vars
               fSymTab = funcsToEnv fs
               env = Map.union varEnv fSymTab
--- typecheck fs vars expr = DataTypes.Ok
 
 
 -- Interpreter
@@ -374,8 +370,8 @@ interpretMatchExpr env e (nilE) (xVar, xsVar, consE) =
 interpretFuncApp :: Environment p -> Expr p -> Expr p -> Either (Error p) (Primitive p)
 interpretFuncApp env e1 e2 =
     interpret env e1 >>= \f -> case f of
-        VClosure _ func -> interpret env e2 >>= func
-        VLambda cloEnv func -> interpret env e2 >>= func --TODO: cloEnv ?
+        VClosure func -> interpret env e2 >>= func
+        VLambda cloEnv func -> interpret env e2 >>= func
 
 {-
 -- Interpreter function
@@ -403,12 +399,9 @@ interpret env expr = case expr of
 
 
 -- Transform input to internal environment
-
-inputTupleToEnvTuple :: (Var, Integer) -> (Var, (Primitive p))
-inputTupleToEnvTuple (var, n) = (var, VInt n)
-
 inputToEnvironment :: [(Var, Integer)] -> Environment p
 inputToEnvironment input = Map.fromList . map inputTupleToEnvTuple $ input
+    where inputTupleToEnvTuple (var, n) = (var, VInt n)
 
 
 -- Transform function definitions to symbol table
@@ -416,8 +409,7 @@ funcDefsToSymTab :: [FunctionDef p] -> Environment p
 funcDefsToSymTab fs =
     let funEnv = Map.fromList $ map
             (\f -> (funcName f,
-                    VClosure (Map.fromList [])
-                             (\arg -> let env = Map.fromList [(funcArg f, arg)] in
+                    VClosure (\arg -> let env = Map.fromList [(funcArg f, arg)] in
                                       let e = funcBody f in
                                       interpret (Map.union env funEnv) e))
             ) fs

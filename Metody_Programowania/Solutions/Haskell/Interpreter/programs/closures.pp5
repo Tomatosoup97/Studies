@@ -1,0 +1,7 @@
+input x in
+
+let n = 5 in
+let inc = fn(x: int) -> x + 1 in
+let add = fn(x: int) -> x + inc(x) + n in
+
+add(x)
