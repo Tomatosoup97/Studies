@@ -133,9 +133,11 @@ unaryOpTypes UNeg = (TInt', TInt')
 
 
 infer_binary_expr_type :: TypeEnvironment p -> BinaryOperator -> Expr p -> Expr p -> Either (Error p) (IType p)
-infer_binary_expr_type env op e1 e2 =
-    infer_type env e1 >>= compareTypes e1 expType >>
-    infer_type env e2 >>= compareTypes e2 expType >>
+infer_binary_expr_type env op e1 e2 = do
+    t1 <- infer_type env e1
+    compareTypes e1 expType t1
+    t2 <- infer_type env e2
+    compareTypes e2 expType t2
     return resType
     where (expType, resType) = binaryOpTypes op
 
@@ -149,27 +151,28 @@ infer_unary_expr_type env op e =
 infer_cond_expr_type :: TypeEnvironment p -> Expr p -> Expr p -> Expr p -> Either (Error p) (IType p)
 infer_cond_expr_type env cond tE fE =
     infer_type env cond >>= compareTypes cond TBool' >>
-    infer_type env tE >>= \t ->
-        infer_type env fE >>= compareTypes fE t
+    infer_type env tE >>= \t -> infer_type env fE >>= compareTypes fE t
 
 
 infer_let_expr_type :: TypeEnvironment p -> Var -> Expr p -> Expr p -> Either (Error p) (IType p)
-infer_let_expr_type env var varExpr expr =
-    infer_type env varExpr >>= \t ->
-        let extEnv = (extendTypeEnv env var t) in
-        infer_type extEnv expr
+infer_let_expr_type env var varExpr expr = do
+    t <- infer_type env varExpr
+    let extEnv = (extendTypeEnv env var t)
+    infer_type extEnv expr
 
 
 infer_pair_type :: TypeEnvironment p -> Expr p -> Expr p -> Either (Error p) (IType p)
-infer_pair_type env e1 e2 =
-    infer_type env e1 >>= \t1 ->
-        infer_type env e2 >>= \t2 -> return (TPair' t1 t2)
+infer_pair_type env e1 e2 = do
+    t1 <- infer_type env e1
+    t2 <- infer_type env e2
+    return (TPair' t1 t2)
 
 
 infer_cons_type :: TypeEnvironment p -> Expr p -> Expr p -> Either (Error p) (IType p)
-infer_cons_type env xE xsE =
-    infer_type env xE >>= \xT ->
-        infer_type env xsE >>= compareTypes xsE (TList' xT)
+infer_cons_type env xE xsE = do
+    xT <- infer_type env xE
+    xsT <- infer_type env xsE
+    compareTypes xsE (TList' xT) xsT
 
 
 infer_fst_type :: TypeEnvironment p -> Expr p -> Either (Error p) (IType p)
@@ -206,9 +209,10 @@ infer_func_app_type env fE argE =
 
 
 infer_lambda_type :: TypeEnvironment p -> Var -> (IType p) -> Expr p -> Either (Error p) (IType p)
-infer_lambda_type cloEnv var t fE =
+infer_lambda_type cloEnv var t fE = do
     let extCloEnv = extendTypeEnv cloEnv var t
-    in infer_type extCloEnv fE >>= \fT -> return $ TArrow' t fT
+    fT <- infer_type extCloEnv fE
+    return $ TArrow' t fT
 
 
 infer_type :: TypeEnvironment p -> Expr p -> Either (Error p) (IType p)
@@ -328,10 +332,10 @@ interpretUnaryOp env op e = case op of
 
 
 interpretLetExpr :: Environment p -> Var -> Expr p -> Expr p -> Either (Error p) (Primitive p)
-interpretLetExpr env var var_expr expr =
-    interpret env var_expr >>= \varValue ->
-        let extEnv = extendEnv env var varValue in
-        interpret extEnv expr
+interpretLetExpr env var var_expr expr = do
+    varValue <- interpret env var_expr
+    let extEnv = extendEnv env var varValue
+    interpret extEnv expr
 
 
 interpretCondExpr :: Environment p -> Expr p -> Expr p -> Expr p -> Either (Error p) (Primitive p)
@@ -342,18 +346,20 @@ interpretCondExpr env condE tE fE =
 
 
 interpretCons :: Environment p -> Expr p -> Expr p -> Either (Error p) (Primitive p)
-interpretCons env e1 e2 =
-    interpret env e1 >>= \x ->
-        interpret env e2 >>= \xs -> case xs of
-            VList xs -> return $ VList (x:xs)
-            VNil _ -> return $ VList [x]
-            VInt i -> Left $ ZeroDivisionError (getData e1)
+interpretCons env e1 e2 = do
+    x <- interpret env e1
+    xs <- interpret env e2
+    case xs of
+        VList xs -> return $ VList (x:xs)
+        VNil _ -> return $ VList [x]
+        VInt i -> Left $ ZeroDivisionError (getData e1)
 
 
 interpretPair :: Environment p -> Expr p -> Expr p -> Either (Error p) (Primitive p)
-interpretPair env e1 e2 =
-    interpret env e1 >>= \x1 ->
-        interpret env e2 >>= \x2 -> return $ VPair x1 x2
+interpretPair env e1 e2 = do
+    x1 <- interpret env e1
+    x2 <- interpret env e2
+    return $ VPair x1 x2
 
 
 interpretMatchExpr :: Environment p -> Expr p -> NilClause p -> ConsClause p -> Either (Error p) (Primitive p)
