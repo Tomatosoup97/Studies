@@ -66,12 +66,12 @@ tests =
   , Test "compare_bool_gt"      (SrcString "if true > false then 1 else 0")          TypeError
   , Test "compare_bool_gte"     (SrcString "if true >= false then 1 else 0")         TypeError
 
-  , Test "complex_check"        (SrcFile "programs/program_typeerror.pp5")           TypeError
+  , Test "complex_check"        (SrcFile "programs/program_typeerror.pp6")           TypeError
 
   -- Integration tests with more complex pp4 programs
 
-  , Test "complex_program"      (SrcFile "programs/program.pp5") (Eval [1, 2, 3] (Value (5)))
-  , Test "max_of_three"         (SrcFile "programs/max_of_three.pp5") (Eval [17, 42, 20] (Value (42)))
+  , Test "complex_program"      (SrcFile "programs/program.pp6") (Eval [1, 2, 3] (Value (5)))
+  , Test "max_of_three"         (SrcFile "programs/max_of_three.pp6") (Eval [17, 42, 20] (Value (42)))
 
   -- PP5 Tests
   -- =================
@@ -119,14 +119,14 @@ tests =
   , Test "match_pair"           (SrcString "match (1, 2) with [] -> e1 | x :: xs -> x")                TypeError
   , Test "match_bool"           (SrcString "match true with [] -> e1 | x :: xs -> x")                  TypeError
 
-  , Test "func_invalid_arg"     (SrcFile "programs/func_invalid_arg.pp5")                              TypeError
-  , Test "invalid_res_type"     (SrcFile "programs/invalid_res_type.pp5")                              TypeError
+  , Test "func_invalid_arg"     (SrcFile "programs/func_invalid_arg.pp6")                              TypeError
+  , Test "invalid_res_type"     (SrcFile "programs/invalid_res_type.pp6")                              TypeError
 
   -- Programs
 
-  , Test "fib"                  (SrcFile "programs/fib.pp5")                                           (Eval [6] (Value (8)))
-  , Test "head"                 (SrcFile "programs/head.pp5")                                          (Eval [3] (Value (5)))
-  , Test "unitFunc"             (SrcFile "programs/unit_func.pp5")                                     (Eval [42] (Value (42)))
+  , Test "fib"                  (SrcFile "programs/fib.pp6")                                           (Eval [6] (Value (8)))
+  , Test "head"                 (SrcFile "programs/head.pp6")                                          (Eval [3] (Value (5)))
+  , Test "unitFunc"             (SrcFile "programs/unit_func.pp6")                                     (Eval [42] (Value (42)))
 
   -- PP6 Tests
   -- =================
@@ -143,10 +143,10 @@ tests =
   , Test "ifLambda"             (SrcString "input x in (if x <> 0 then fn(x:int) -> x + 5 else fn(x:int) -> x + 2) x") (Eval [1] (Value 6))
 
   -- From file
-  , Test "closures"             (SrcFile "programs/closures.pp5")                                      (Eval [5] (Value (16)))
-  , Test "lambdaInFunc"         (SrcFile "programs/lambdaInFunc.pp5")                                  (Eval [10] (Value (15)))
-  , Test "lambdaAsArg"          (SrcFile "programs/lambdaAsArg.pp5")                                   (Eval [3] (Value (11)))
-  , Test "listOfLambdas"        (SrcFile "programs/listOfLambdas.pp5")                                 (Eval [1] (Value (6)))
+  , Test "closures"             (SrcFile "programs/closures.pp6")                                      (Eval [5] (Value (16)))
+  , Test "lambdaInFunc"         (SrcFile "programs/lambdaInFunc.pp6")                                  (Eval [10] (Value (15)))
+  , Test "lambdaAsArg"          (SrcFile "programs/lambdaAsArg.pp6")                                   (Eval [3] (Value (11)))
+  , Test "listOfLambdas"        (SrcFile "programs/listOfLambdas.pp6")                                 (Eval [1] (Value (6)))
 
   -- Test PP6 type checker
 
@@ -155,5 +155,5 @@ tests =
   , Test "lambdaInvArg"         (SrcString "let foo = fn(x: bool) -> 1 in foo(1)")                     TypeError
   , Test "nameCollision"        (SrcString "fun f(x : int): int = x input x in let f = x in f f")      TypeError
   , Test "returnLambda"         (SrcString "fn(x:int) -> x + 1")                                       TypeError
-  , Test "lambdaArgInvType"     (SrcFile   "programs/lambdaArgInvType.pp5")                            TypeError
+  , Test "lambdaArgInvType"     (SrcFile   "programs/lambdaArgInvType.pp6")                            TypeError
   ]
