@@ -10,3 +10,7 @@ node_modules
 # Jupyter notebook
 .ipynb_checkpoints
 
+# OCaml
+*.cmi
+*.cmo
+
