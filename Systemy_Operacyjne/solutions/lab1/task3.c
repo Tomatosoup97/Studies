@@ -1,16 +1,11 @@
 #include <stdio.h>
 #include <unistd.h>
-#include <ctype.h>
 #include <sys/wait.h>
-#include <stdbool.h>
 #include <string.h>
 #include "common.h"
+#include "procword.h"
 
-
-#define AL_SIZE 26
 #define BUFF_SIZE 1024
-#define CHARS_ARRAY_SIZE (26 + 10)  // letters + digits
-#define EXIT_WORD "EXIT"
 
 static bool verbose = false;
 
@@ -21,39 +16,6 @@ int pipe_write[2];
 void close_pipe(int *pipefd) {
     close(pipefd[0]);
     close(pipefd[1]);
-}
-
-char* filter(char *word, int len, bool (*f)(char)) {
-    char *c = word;
-    char *new_word = malloc(len * sizeof(char));
-    int i = 0;
-
-    while (*c != '\0')
-        if (f(*c++)) *(new_word + i++) = *(c-1);
-
-    new_word[i] = '\0';
-    return new_word;
-}
-
-static bool isalnum_wrapper(char c) {
-    // Wrapper that makes types match with filter function
-    return isalnum(c);
-}
-
-static int get_char_index(char c) {
-    if (isdigit(c)) {
-        return c - '0' + AL_SIZE;
-    } else {
-        return toupper(c) - (int) 'A';
-    }
-}
-
-static char get_char_by_index(int i) {
-    if (i >= AL_SIZE) {
-        return (i - AL_SIZE) + '0';
-    } else {
-        return 'A' + i;
-    }
 }
 
 void formatter() {

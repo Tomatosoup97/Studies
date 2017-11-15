@@ -1,14 +1,9 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <ucontext.h>
-#include <ctype.h>
-#include <stdbool.h>
 #include "common.h"
+#include "procword.h"
 
-#define AL_SIZE 26
 #define F_STACK_SIZE 16384  // 2^14
-#define CHARS_ARRAY_SIZE (26 + 10)  // letters + digits
-#define EXIT_WORD "EXIT"
 
 static bool verbose;
 static int chars_count[CHARS_ARRAY_SIZE];
@@ -26,45 +21,12 @@ void swapcontext_wrapper(ucontext_t *uctx_from, ucontext_t *uctx_to,
         handle_error("swapcontext");
 }
 
-char* filter(char *word, int len, bool (*f)(char)) {
-    char *c = word;
-    char *new_word = malloc(len * sizeof(char));
-    int i = 0;
-
-    while (*c != '\0')
-        if (f(*c++)) *(new_word + i++) = *(c-1);
-
-    new_word[i] = '\0';
-    return new_word;
-}
-
-static bool isalnum_wrapper(char c) {
-    // Wrapper that makes types match with filter function
-    return isalnum(c);
-}
-
 void process_word() {
     while (word && strcmp(word, EXIT_WORD) != 0) {
         if (verbose) printf("formatter: processsing input...");
         word = filter(word, strlen(word), isalnum_wrapper);
 
         swapcontext_wrapper(&uctx_formatter, &uctx_writer, "formatter", "writer");
-    }
-}
-
-static int get_char_index(char c) {
-    if (isdigit(c)) {
-        return c - '0' + AL_SIZE;
-    } else {
-        return toupper(c) - (int) 'A';
-    }
-}
-
-static char get_char_by_index(int i) {
-    if (i >= AL_SIZE) {
-        return (i - AL_SIZE) + '0';
-    } else {
-        return 'A' + i;
     }
 }
 
