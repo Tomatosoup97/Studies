@@ -1,0 +1,75 @@
+One hundred years after Albert Einstein developed his general theory of relativity, physicists are still stuck with perhaps the biggest incompatibility problem in the universe. The smoothly warped space-time landscape that Einstein described is like a painting by Salvador Dalí — seamless, unbroken, geometric. But the quantum particles that occupy this space are more like something from Georges Seurat: pointillist, discrete, described by probabilities. At their core, the two descriptions contradict each other. Yet a bold new strain of thinking suggests that quantum correlations between specks of impressionist paint actually create not just Dalí’s landscape, but the canvases that both sit on, as well as the three-dimensional space around them. And Einstein, as he so often does, sits right in the center of it all, still turning things upside-down from beyond the grave.
+
+Like initials carved in a tree, ER = EPR, as the new idea is known, is a shorthand that joins two ideas proposed by Einstein in 1935. One involved the paradox implied by what he called “spooky action at a distance” between quantum particles (the EPR paradox, named for its authors, Einstein, Boris Podolsky and Nathan Rosen). The other showed how two black holes could be connected through far reaches of space through “wormholes” (ER, for Einstein-Rosen bridges). At the time that Einstein put forth these ideas — and for most of the eight decades since — they were thought to be entirely unrelated.
+
+When Einstein, Podolsky and Rosen published their seminal paper pointing out puzzling features of what we now call entanglement, The New York Times treated it as front-page news.
+When Einstein, Podolsky and Rosen published their seminal paper pointing out puzzling features of what we now call entanglement, The New York Times treated it as front-page news.
+The New York Times
+But if ER = EPR is correct, the ideas aren’t disconnected — they’re two manifestations of the same thing. And this underlying connectedness would form the foundation of all space-time. Quantum entanglement — the action at a distance that so troubled Einstein — could be creating the “spatial connectivity” that “sews space together,” according to Leonard Susskind, a physicist at Stanford University and one of the idea’s main architects. Without these connections, all of space would “atomize,” according to Juan Maldacena, a physicist at the Institute for Advanced Study in Princeton, N.J., who developed the idea together with Susskind. “In other words, the solid and reliable structure of space-time is due to the ghostly features of entanglement,” he said. What’s more, ER = EPR has the potential to address how gravity fits together with quantum mechanics.
+
+Not everyone’s buying it, of course (nor should they; the idea is in “its infancy,” said Susskind). Joe Polchinski, a researcher at the Kavli Institute for Theoretical Physics at the University of California, Santa Barbara, whose own stunning paradox about firewalls in the throats of black holes triggered the latest advances, is cautious, but intrigued. “I don’t know where it’s going,” he said, “but it’s a fun time right now.”
+
+The Black Hole Wars
+
+The road that led to ER = EPR is a Möbius strip of tangled twists and turns that folds back on itself, like a drawing by M.C. Escher.
+
+A fair place to start might be quantum entanglement. If two quantum particles are entangled, they become, in effect, two parts of a single unit. What happens to one entangled particle happens to the other, no matter how far apart they are.
+
+Juan Maldacena at the Institute for Advanced Study in Princeton, N.J.
+Juan Maldacena at the Institute for Advanced Study in Princeton, N.J.
+Andrea Kane/Institute for Advanced Study
+Maldacena sometimes uses a pair of gloves as an analogy: If you come upon the right-handed glove, you instantaneously know the other is left-handed. There’s nothing spooky about that. But in the quantum version, both gloves are actually left- and right-handed (and everything in between) up until the moment you observe them. Spookier still, the left-handed glove doesn’t become left until you observe the right-handed one — at which moment both instantly gain a definite handedness.
+
+Entanglement played a key role in Stephen Hawking’s 1974 discovery that black holes could evaporate. This, too, involved entangled pairs of particles. Throughout space, short-lived “virtual” particles of matter and anti-matter continually pop into and out of existence. Hawking realized that if one particle fell into a black hole and the other escaped, the hole would emit radiation, glowing like a dying ember. Given enough time, the hole would evaporate into nothing, raising the question of what happened to the information content of the stuff that fell into it.
+
+But the rules of quantum mechanics forbid the complete destruction of information. (Hopelessly scrambling information is another story, which is why documents can be burned and hard drives smashed. There’s nothing in the laws of physics that prevents the information lost in a book’s smoke and ashes from being reconstructed, at least in principle.) So the question became: Would the information that originally went into the black hole just get scrambled? Or would it be truly lost? The arguments set off what Susskind called the “black hole wars,” which have generated enough stories to fill many books. (Susskind’s was subtitled “My Battle with Stephen Hawking to Make the World Safe for Quantum Mechanics.”)
+
+Eventually Susskind — in a discovery that shocked even him — realized (with Gerard ’t Hooft) that all the information that fell down the hole was actually trapped on the black hole’s two-dimensional event horizon, the surface that marks the point of no return. The horizon encoded everything inside, like a hologram. It was as if the bits needed to re-create your house and everything in it could fit on the walls. The information wasn’t lost — it was scrambled and stored out of reach.
+
+Leonard Susskind at home in Palo Alto, Calif.
+Leonard Susskind at home in Palo Alto, Calif.
+Jeff Singer
+Susskind continued to work on the idea with Maldacena, whom Susskind calls “the master,” and others. Holography began to be used not just to understand black holes, but any region of space that can be described by its boundary. Over the past decade or so, the seemingly crazy idea that space is a kind of hologram has become rather humdrum, a tool of modern physics used in everything from cosmology to condensed matter. “One of the things that happen to scientific ideas is they often go from wild conjecture to reasonable conjecture to working tools,” Susskind said. “It’s gotten routine.”
+
+Holography was concerned with what happens on boundaries, including black hole horizons. That left open the question of what goes on in the interiors, said Susskind, and answers to that “were all over the map.” After all, since no information could ever escape from inside a black hole’s horizon, the laws of physics prevented scientists from ever directly testing what was going on inside.
+
+Then in 2012 Polchinski, along with Ahmed Almheiri, Donald Marolf and James Sully, all of them at the time at Santa Barbara, came up with an insight so startling it basically said to physicists: Hold everything. We know nothing.
+
+The so-called AMPS paper (after its authors’ initials) presented a doozy of an entanglement paradox — one so stark it implied that black holes might not, in effect, even have insides, for a “firewall” just inside the horizon would fry anyone or anything attempting to find out its secrets.
+
+Scaling the Firewall       
+
+Here’s the heart of their argument: If a black hole’s event horizon is a smooth, seemingly ordinary place, as relativity predicts (the authors call this the “no drama” condition), the particles coming out of the black hole must be entangled with particles falling into the black hole. Yet for information not to be lost, the particles coming out of the black hole must also be entangled with particles that left long ago and are now scattered about in a fog of Hawking radiation. That’s one too many kinds of entanglements, the AMPS authors realized. One of them would have to go.
+
+The reason is that maximum entanglements have to be monogamous, existing between just two particles. Two maximum entanglements at once — quantum polygamy — simply cannot happen, which suggests that the smooth, continuous space-time inside the throats of black holes can’t exist. A break in the entanglement at the horizon would imply a discontinuity in space, a pileup of energy: the “firewall.”
+
+David Kaplan explores one of the biggest mysteries in physics: the apparent contradiction between general relativity and quantum mechanics.
+Video: David Kaplan explores one of the biggest mysteries in physics: the apparent contradiction between general relativity and quantum mechanics.
+Filming by Petr Stepanek. Editing and motion graphics by MK12. Music by Steven Gutheinz.
+The AMPS paper became a “real trigger,” said Stephen Shenker, a physicist at Stanford, and “cast in sharp relief” just how much was not understood. Of course, physicists love such paradoxes, because they’re fertile ground for discovery.
+
+Both Susskind and Maldacena got on it immediately. They’d been thinking about entanglement and wormholes, and both were inspired by the work of Mark Van Raamsdonk, a physicist at the University of British Columbia in Vancouver, who had conducted a pivotal thought experiment suggesting that entanglement and space-time are intimately related.
+
+“Then one day,” said Susskind, “Juan sent me a very cryptic message that contained the equation ER = EPR. I instantly saw what he was getting at, and from there we went back and forth expanding the idea.”
+
+Their investigations, which they presented in a 2013 paper, “Cool Horizons for Entangled Black Holes,” argued for a kind of entanglement they said the AMPS authors had overlooked — the one that “hooks space together,” according to Susskind. AMPS assumed that the parts of space inside and outside of the event horizon were independent. But Susskind and Maldacena suggest that, in fact, particles on either side of the border could be connected by a wormhole. The ER = EPR entanglement could “kind of get around the apparent paradox,” said Van Raamsdonk. The paper contained a graphic that some refer to half-jokingly as the “octopus picture” — with multiple wormholes leading from the inside of a black hole to Hawking radiation on the outside.
+
+The ER = EPR idea posits that entangled particles inside and outside of a black hole’s event horizon are connected via wormholes.
+Olena Shmahalo/Quanta Magazine
+In other words, there was no need for an entanglement that would create a kink in the smooth surface of the black hole’s throat. The particles still inside the hole would be directly connected to particles that left long ago. No need to pass through the horizon, no need to pass Go. The particles on the inside and the far-out ones could be considered one and the same, Maldacena explained — like me, myself and I. The complex “octopus” wormhole would link the interior of the black hole directly to particles in the long-departed cloud of Hawking radiation.
+
+Holes in the Wormhole
+
+No one is sure yet whether ER = EPR will solve the firewall problem. John Preskill, a physicist at the California Institute of Technology in Pasadena, reminded readers of Quantum Frontiers, the blog for Caltech’s Institute for Quantum Information and Matter, that sometimes physicists rely on their “sense of smell” to sniff out which theories have promise. “At first whiff,” he wrote, “ER = EPR may smell fresh and sweet, but it will have to ripen on the shelf for a while.”
+
+Whatever happens, the correspondence between entangled quantum particles and the geometry of smoothly warped space-time is a “big new insight,” said Shenker. It’s allowed him and his collaborator Douglas Stanford, a researcher at the Institute for Advanced Study, to tackle complex problems in quantum chaos through what Shenker calls “simple geometry that even I can understand.”
+
+To be sure, ER = EPR does not yet apply to just any kind of space, or any kind of entanglement. It takes a special type of entanglement and a special type of wormhole. “Lenny and Juan are completely aware of this,” said Marolf, who recently co-authored a paper describing wormholes with more than two ends. ER = EPR works in very specific situations, he said, but AMPS argues that the firewall presents a much broader challenge.
+
+Like Polchinski and others, Marolf worries that ER = EPR modifies standard quantum mechanics. “A lot of people are really interested in the ER = EPR conjecture,” said Marolf. “But there’s a sense that no one but Lenny and Juan really understand what it is.” Still, “it’s an interesting time to be in the field.”
+
+Clarification on April 27, 2015: The article has been altered to clarify that only maximally entangled particles have to have monogamous entanglements. 
+
+Part two of this series, exploring the details of how entanglement could construct space-time, will appear on Tuesday, April 28.
+
+
