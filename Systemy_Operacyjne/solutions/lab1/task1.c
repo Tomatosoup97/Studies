@@ -111,7 +111,6 @@ int main(int argc, char *argv[]) {
         }
         if (strcmp(argv[2], "--reaper") == 0) {
             prctl(PR_SET_CHILD_SUBREAPER);
-            // spawn_process_reaper(); // (TODO: ?)
         }
     }
 
