@@ -16,3 +16,7 @@ node_modules
 
 .idea
 
+*.tar.bz2
+
+.vagrant
+
