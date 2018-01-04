@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 
-xs = [0, 3.5, 25, 25, -5,-5, 15, -0.5, 19.5, 7, 1.5]
+xs = [0, 3.5, 25, 25, -5, -5, 15, -0.5, 19.5, 7, 1.5]
 ys = [0, 36, 25, 1.5, 3, 33, 11, 35, 15.5, 0, 10.5]
 weight = [1, 6, 4, 2, 3, 2, 2, 1, 5, 4, 1]
 
@@ -12,7 +12,7 @@ def newton(n, k):
 
 
 def bernstein(n, i, t):
-    return newton(n, i) * ( (t ** i) * ((1-t) ** (n-i)) )
+    return newton(n, i) * ((t ** i) * ((1-t) ** (n-i)))
 
 
 def calc_step(n, t, times):
@@ -45,4 +45,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
