@@ -99,9 +99,13 @@ int posix_memalign(void **memptr, size_t alignment, size_t size) {
 
     pthread_mutex_lock(&mem_ctl.mutex);
 
+    size_t aligned_size = align_size(size, alignment);
+
     if (size > SEPARATE_CHUNK_THRESHOLD) {
-        mem_chunk_t *chunk = allocate_chunk(size);
-        mem_block_t *block = allocate_block(chunk, size);
+        mem_chunk_t *chunk = allocate_chunk(aligned_size);
+        mem_block_t *allocated_block = allocate_mem_in_block(&chunk,
+                                                             &chunk->ma_first,
+                                                             aligned_size);
     }
 
     pthread_mutex_unlock(&mem_ctl.mutex);

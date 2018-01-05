@@ -11,6 +11,9 @@
 #define PAGESIZE (getpagesize())
 #define SEPARATE_CHUNK_THRESHOLD (PAGESIZE * 4)
 
+#define SND_FREE_BLK_IN_CHUNK(chunk) \
+    LIST_NEXT(LIST_FIRST(&chunk->ma_freeblks), mb_node)
+
 typedef struct mem_block {
     int32_t mb_size;                    // mb_size < 0 => allocated
     union {
@@ -26,9 +29,15 @@ typedef struct mem_chunk {
     mem_block_t *ma_first;              // first block in the chunk
 } mem_chunk_t;
 
+size_t align_size(size_t size, size_t alignment);
+
 size_t calc_required_space(size_t size);
 
 mem_chunk_t *allocate_chunk(size_t size);
+
+mem_chunk_t *find_chunk(void *ptr);
+
+void free_chunk(mem_chunk_t *chunk);
 
 void dump_chunk_list();
 

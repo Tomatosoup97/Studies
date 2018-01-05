@@ -5,6 +5,8 @@
 #include "mem_mgmt.h"
 #include "chunk.h"
 
+extern mem_ctl_t mem_ctl;
+
 void test_setup(void) {
     // Do nothing
 }
@@ -36,6 +38,12 @@ MU_TEST(is_power_of_two) {
 
 /* TEST CHUNK */
 
+MU_TEST(test_align_size) {
+    mu_check(align_size(15, 16) == 16);
+    mu_check(align_size(32, 8) == 32);
+    mu_check(align_size(42, 8) == 48);
+}
+
 MU_TEST(test_calc_space_required) {
     mu_check(calc_required_space(10) == PAGESIZE);
     mu_check(calc_required_space(PAGESIZE - sizeof(mem_chunk_t)) == PAGESIZE);
@@ -53,7 +61,38 @@ MU_TEST(test_allocate_chunk) {
     // assert list and ma_first are the same
     mu_check(LIST_FIRST(&chunk->ma_freeblks)->mb_size == chunk->ma_first->mb_size);
     // assert list has one element
-    mu_check( LIST_NEXT(LIST_FIRST(&chunk->ma_freeblks), mb_node) == NULL );
+    mu_check( SND_FREE_BLK_IN_CHUNK(chunk) == NULL );
+}
+
+MU_TEST(test_find_chunk) {
+    allocate_chunk(2048);
+    mem_chunk_t *chunk1 = allocate_chunk(PAGESIZE - sizeof(mem_chunk_t));
+    mem_chunk_t *chunk2 = allocate_chunk(PAGESIZE * 2);
+    allocate_chunk(512);
+
+    mu_check(find_chunk((void*) ((uint64_t) chunk1) + 64) == chunk1);
+    mu_check(find_chunk((void*) ((uint64_t) chunk1) + PAGESIZE - 1) == chunk1);
+    mu_check(find_chunk((void*) ((uint64_t) chunk2) + 1024) == chunk2);
+    mu_check(find_chunk((void*) 0xFFFFFFFF) == NULL);
+}
+
+MU_TEST(test_free_chunk) {
+    LIST_INIT(&mem_ctl.ma_chunks); // reset list
+    mem_chunk_t *chunk1 = allocate_chunk(64);
+    mem_chunk_t *chunk2 = allocate_chunk(PAGESIZE);
+    mem_chunk_t *chunk3 = allocate_chunk(PAGESIZE * 2);
+
+    free_chunk(chunk2);
+    mem_chunk_t *fst_chunk = LIST_FIRST(&mem_ctl.ma_chunks);
+    mu_check(
+            fst_chunk == chunk3 &&
+            LIST_NEXT(fst_chunk, ma_node) == chunk1 &&
+            LIST_NEXT(LIST_NEXT(fst_chunk, ma_node), ma_node) == NULL
+    );
+
+    free_chunk(chunk1);
+    fst_chunk = LIST_FIRST(&mem_ctl.ma_chunks);
+    mu_check( fst_chunk == chunk3 && LIST_NEXT(fst_chunk, ma_node) == NULL );
 }
 
 /* CONFIG */
@@ -67,6 +106,9 @@ MU_TEST_SUITE(test_suite) {
     /* TEST CHUNK */
     MU_RUN_TEST(test_calc_space_required);
     MU_RUN_TEST(test_allocate_chunk);
+    MU_RUN_TEST(test_align_size);
+    MU_RUN_TEST(test_find_chunk);
+    MU_RUN_TEST(test_free_chunk);
 }
 
 int main() {
@@ -74,6 +116,5 @@ int main() {
 
     MU_RUN_SUITE(test_suite);
     MU_REPORT();
-    mdump();
     return 0;
 }

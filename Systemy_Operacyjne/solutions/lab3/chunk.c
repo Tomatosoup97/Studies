@@ -51,16 +51,39 @@ mem_chunk_t *allocate_chunk(size_t size) {
     return new_chunk;
 }
 
-mem_chunk_t *find_chunk(size_t size) {
+mem_chunk_t *find_chunk(void *ptr) {
+    /* Find chunk which holds given :ptr: address. Return NULL on failure
+     * */
+    mem_chunk_t *chunk;
+    uint64_t target_addr = (uint64_t) ptr;
 
+    LIST_FOREACH(chunk, &mem_ctl.ma_chunks, ma_node) {
+        uint64_t chunk_addr = (uint64_t) chunk;
+        uint64_t chunk_size = chunk->size + sizeof(mem_chunk_t);
+        if ( target_addr > chunk_addr &&
+             target_addr < chunk_addr + chunk_size) {
+            return chunk;
+        }
+    }
+    return NULL;
 }
 
-mem_block_t *allocate_block(mem_chunk_t chunk, size_t size) {
-    mem_block_t *new_block;
+void free_chunk(mem_chunk_t *chunk) {
+    assert(SND_FREE_BLK_IN_CHUNK(chunk) == NULL);
+    // TODO: free block mem space
+    // TODO: free chunk mem space
+    LIST_REMOVE(chunk, ma_node);
+}
 
+mem_block_t *allocate_mem_in_block(mem_chunk_t *chunk, mem_block_t *block, size_t size) {
+    assert(block->mb_size >= size);
+    pthread_mutex_lock(&mem_ctl.mutex);
+
+    block->mb_size -= size;
     // TODO
 
-    return new_block;
+    pthread_mutex_unlock(&mem_ctl.mutex);
+    return NULL;
 }
 
 void dump_chunk_list() {
