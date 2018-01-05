@@ -57,12 +57,26 @@ mem_chunk_t *find_chunk(void *ptr) {
     mem_chunk_t *chunk;
     uint64_t target_addr = (uint64_t) ptr;
 
-    LIST_FOREACH(chunk, &mem_ctl.ma_chunks, ma_node) {
+    FOR_EACH_CHUNK(chunk) {
         uint64_t chunk_addr = (uint64_t) chunk;
         uint64_t chunk_size = chunk->size + sizeof(mem_chunk_t);
         if ( target_addr > chunk_addr &&
              target_addr < chunk_addr + chunk_size) {
             return chunk;
+        }
+    }
+    return NULL;
+}
+
+mem_block_t *find_free_block_with_size(size_t size) {
+    mem_chunk_t *chunk;
+    mem_block_t *block;
+
+    FOR_EACH_CHUNK(chunk) {
+        FOR_EACH_FREE_BLOCK(block, chunk) {
+            if (block->mb_size >= size) {
+                return block;
+            }
         }
     }
     return NULL;
@@ -75,15 +89,18 @@ void free_chunk(mem_chunk_t *chunk) {
     LIST_REMOVE(chunk, ma_node);
 }
 
-mem_block_t *allocate_mem_in_block(mem_chunk_t *chunk, mem_block_t *block, size_t size) {
-    assert(block->mb_size >= size);
+mem_block_t *allocate_mem_in_block(mem_chunk_t *chunk, mem_block_t *free_block, size_t size) {
+    mem_block_t *alloc_block;
+    assert(free_block->mb_size >= size);
     pthread_mutex_lock(&mem_ctl.mutex);
 
-    block->mb_size -= size;
+    alloc_block = (void*) free_block;
+
+    free_block->mb_size -= size;
     // TODO
 
     pthread_mutex_unlock(&mem_ctl.mutex);
-    return NULL;
+    return alloc_block;
 }
 
 void dump_chunk_list() {
@@ -91,11 +108,11 @@ void dump_chunk_list() {
     mem_chunk_t *chunk;
     mem_block_t *block;
 
-    printf("Format: [chunk size] :: [fst free blk size] -> [snd free blk size]\n\n");
+    printf("\nFormat: [chunk size] :: [fst free blk size] -> ... -> [nth free blk size]\n\n");
 
-    LIST_FOREACH(chunk, &mem_ctl.ma_chunks, ma_node) {
+    FOR_EACH_CHUNK(chunk) {
         printf("[%d] :: ", chunk->size);
-        LIST_FOREACH(block, &chunk->ma_freeblks, mb_node) {
+        FOR_EACH_FREE_BLOCK(block, chunk) {
             printf("[%d]", block->mb_size);
             if (LIST_NEXT(block, mb_node) != NULL) printf(" -> ");
         }
@@ -103,4 +120,3 @@ void dump_chunk_list() {
     }
     printf("\n");
 }
-

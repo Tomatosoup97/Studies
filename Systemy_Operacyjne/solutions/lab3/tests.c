@@ -57,7 +57,7 @@ MU_TEST(test_allocate_chunk) {
 
     mu_check(chunk->size == exp_chunk_size);
     // assert first block has expected size
-    mu_check(chunk->ma_first->mb_size == exp_chunk_size - sizeof(mem_block_t));
+    mu_check(chunk->ma_first->mb_size == (exp_chunk_size - sizeof(mem_block_t)));
     // assert list and ma_first are the same
     mu_check(LIST_FIRST(&chunk->ma_freeblks)->mb_size == chunk->ma_first->mb_size);
     // assert list has one element
@@ -76,14 +76,37 @@ MU_TEST(test_find_chunk) {
     mu_check(find_chunk((void*) 0xFFFFFFFF) == NULL);
 }
 
+MU_TEST(test_find_free_block_with_size) {
+    LIST_INIT(&mem_ctl.ma_chunks); // reset list
+
+    mem_chunk_t *chunk1 = allocate_chunk(PAGESIZE);
+    mem_chunk_t *chunk2 = allocate_chunk(PAGESIZE*3);
+    mem_chunk_t *chunk3 = allocate_chunk(256);
+
+    mu_check(find_free_block_with_size(PAGESIZE*2) == chunk2->ma_first);
+}
+
+MU_TEST(test_find_free_block_with_size__return_null_when_no_block_found) {
+    LIST_INIT(&mem_ctl.ma_chunks); // reset list
+
+    mem_chunk_t *chunk1 = allocate_chunk(PAGESIZE);
+    mem_chunk_t *chunk2 = allocate_chunk(PAGESIZE * 3 - sizeof(mem_chunk_t));
+    mem_chunk_t *chunk3 = allocate_chunk(256);
+
+    mu_check(find_free_block_with_size(PAGESIZE * 3) == NULL);
+}
+
 MU_TEST(test_free_chunk) {
     LIST_INIT(&mem_ctl.ma_chunks); // reset list
+    // Create [chunk3] -> [chunk2] -> [chunk1]
     mem_chunk_t *chunk1 = allocate_chunk(64);
     mem_chunk_t *chunk2 = allocate_chunk(PAGESIZE);
     mem_chunk_t *chunk3 = allocate_chunk(PAGESIZE * 2);
+    mdump();
 
     free_chunk(chunk2);
     mem_chunk_t *fst_chunk = LIST_FIRST(&mem_ctl.ma_chunks);
+    // Assert [chunk3] -> [chunk1]
     mu_check(
             fst_chunk == chunk3 &&
             LIST_NEXT(fst_chunk, ma_node) == chunk1 &&
@@ -92,6 +115,7 @@ MU_TEST(test_free_chunk) {
 
     free_chunk(chunk1);
     fst_chunk = LIST_FIRST(&mem_ctl.ma_chunks);
+    // Assert [chunk3]
     mu_check( fst_chunk == chunk3 && LIST_NEXT(fst_chunk, ma_node) == NULL );
 }
 
@@ -109,6 +133,9 @@ MU_TEST_SUITE(test_suite) {
     MU_RUN_TEST(test_align_size);
     MU_RUN_TEST(test_find_chunk);
     MU_RUN_TEST(test_free_chunk);
+    MU_RUN_TEST(test_find_free_block_with_size);
+    MU_RUN_TEST(test_find_free_block_with_size__return_null_when_no_block_found);
+
 }
 
 int main() {
