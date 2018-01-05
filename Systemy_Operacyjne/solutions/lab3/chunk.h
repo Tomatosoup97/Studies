@@ -21,6 +21,8 @@
 #define SND_FREE_BLK_IN_CHUNK(chunk) \
     LIST_NEXT(LIST_FIRST(&chunk->ma_freeblks), mb_node)
 
+#define FULL_CHUNK_SIZE(chunk) (chunk->size + sizeof(mem_chunk_t))
+
 typedef struct mem_block {
     int32_t mb_size;                    // mb_size < 0 => allocated
     void *prev_block;

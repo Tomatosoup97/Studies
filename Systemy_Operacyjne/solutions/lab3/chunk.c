@@ -59,7 +59,7 @@ mem_chunk_t *find_chunk(void *ptr) {
 
     FOR_EACH_CHUNK(chunk) {
         uint64_t chunk_addr = (uint64_t) chunk;
-        uint64_t chunk_size = chunk->size + sizeof(mem_chunk_t);
+        uint64_t chunk_size = FULL_CHUNK_SIZE(chunk);
         if ( target_addr > chunk_addr &&
              target_addr < chunk_addr + chunk_size) {
             return chunk;
@@ -69,28 +69,29 @@ mem_chunk_t *find_chunk(void *ptr) {
 }
 
 mem_block_t *find_free_block_with_size(size_t size) {
+    /* Find first block that has free :size: space */
     mem_chunk_t *chunk;
     mem_block_t *block;
 
-    FOR_EACH_CHUNK(chunk) {
-        FOR_EACH_FREE_BLOCK(block, chunk) {
-            if (block->mb_size >= size) {
+    FOR_EACH_CHUNK(chunk)
+        FOR_EACH_FREE_BLOCK(block, chunk)
+            if (block->mb_size >= size)
                 return block;
-            }
-        }
-    }
+
     return NULL;
 }
 
 void free_chunk(mem_chunk_t *chunk) {
     assert(SND_FREE_BLK_IN_CHUNK(chunk) == NULL);
-    // TODO: free block mem space
+    // TODO: free_block(chunk->ma_first) ?
     // TODO: free chunk mem space
+    // munmap(chunk, FULL_CHUNK_SIZE(chunk));
     LIST_REMOVE(chunk, ma_node);
 }
 
-mem_block_t *allocate_mem_in_block(mem_chunk_t *chunk, mem_block_t *free_block, size_t size) {
+mem_block_t *allocate_mem_in_block(mem_block_t *free_block, size_t size) {
     mem_block_t *alloc_block;
+
     assert(free_block->mb_size >= size);
     pthread_mutex_lock(&mem_ctl.mutex);
 

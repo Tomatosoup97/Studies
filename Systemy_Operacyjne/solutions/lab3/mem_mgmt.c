@@ -14,33 +14,28 @@ mem_ctl_t mem_ctl = {
 };
 
 void *my_malloc(size_t size) {
+    // TODO: test
     void *ptr;
     int res;
 
     pthread_mutex_lock(&mem_ctl.mutex);
-
     res = posix_memalign(&ptr, WORDSIZE, size);
-
-    if (res == ENOMEM) {
-        errno = ENOMEM;
-    }
+    if (res == ENOMEM) errno = ENOMEM;
 
     pthread_mutex_unlock(&mem_ctl.mutex);
     return ptr;
 }
 
 void *calloc(size_t count, size_t size) {
-    // allocate mem for an array of *count* elements of *size* bytes each
+    // TODO: test
     void *ptr;
-    int res;
 
     pthread_mutex_lock(&mem_ctl.mutex);
+    int res = posix_memalign(&ptr, WORDSIZE, count * size);
+    if (res == ENOMEM) errno = ENOMEM;
 
-    res = posix_memalign(&ptr, WORDSIZE, count * size);
-
-    if (res == ENOMEM) {
-        errno = ENOMEM;
-    }
+    char *memory = (char*) ptr;
+    if (ptr != NULL) for (int i=0; i<size; i++) memory[i] = 0;
 
     pthread_mutex_unlock(&mem_ctl.mutex);
     return ptr;
@@ -48,33 +43,30 @@ void *calloc(size_t count, size_t size) {
 
 void *realloc(void *ptr, size_t size) {
     // change size of em block pointed to by *ptr*
-    // if ptr == NULL: return malloc(size)
-    // if size == 0: free(ptr)
     if (size == 0) {
         free(ptr);
         return NULL;
     }
-    if (ptr == NULL) {
+    if (ptr == NULL)
         return malloc(size);
-    }
+
     pthread_mutex_lock(&mem_ctl.mutex);
 
-    // TODO
+    // TODO: implement
 
     pthread_mutex_unlock(&mem_ctl.mutex);
     return NULL;
 }
 
 void free(void *ptr) {
-    // free memory space pointed by *ptr*
-    // undefined behaviour on double free
-    // if ptr == NULL do nothing
-    if (ptr == NULL) {
+    mem_block_t *chunk;
+
+    if (ptr == NULL)
         return;
-    }
     pthread_mutex_lock(&mem_ctl.mutex);
 
-    // TODO
+    chunk = find_chunk(ptr);
+    // TODO: implement
 
     pthread_mutex_unlock(&mem_ctl.mutex);
 }
@@ -84,28 +76,30 @@ void mdump() {
     dump_chunk_list();
 }
 
-int posix_memalign(void **memptr, size_t alignment, size_t size) {
-    // Allocate *size* bytes and places the address of the allocated
-    // memory in *memptr*.
 
-    if (!IS_POWER_OF_TWO(alignment) || alignment % sizeof(void*) != 0) {
+int posix_memalign(void **memptr, size_t alignment, size_t size) {
+    size_t aligned_size;
+    mem_block_t *free_block;
+    mem_chunk_t *new_chunk;
+
+    if (!IS_POWER_OF_TWO(alignment) || alignment % sizeof(void*) != 0)
         return EINVAL;
-    }
 
     if (size == 0) {
-        memptr = NULL;
+        *memptr = NULL;
         return 0;
     }
 
     pthread_mutex_lock(&mem_ctl.mutex);
 
-    size_t aligned_size = align_size(size, alignment);
+    aligned_size = align_size(size, alignment);
 
-    if (size > SEPARATE_CHUNK_THRESHOLD) {
+    if (size <= SEPARATE_CHUNK_THRESHOLD &&
+            (free_block = find_free_block_with_size(aligned_size)) != NULL) {
+         *memptr = allocate_mem_in_block(&free_block, aligned_size);
+    } else {
         mem_chunk_t *chunk = allocate_chunk(aligned_size);
-        mem_block_t *allocated_block = allocate_mem_in_block(&chunk,
-                                                             &chunk->ma_first,
-                                                             aligned_size);
+        *memptr = allocate_mem_in_block(&chunk->ma_first, aligned_size);
     }
 
     pthread_mutex_unlock(&mem_ctl.mutex);

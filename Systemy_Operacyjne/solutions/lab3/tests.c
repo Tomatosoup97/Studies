@@ -52,6 +52,7 @@ MU_TEST(test_calc_space_required) {
 }
 
 MU_TEST(test_allocate_chunk) {
+    LIST_INIT(&mem_ctl.ma_chunks); // reset list
     mem_chunk_t *chunk = allocate_chunk(PAGESIZE * 2);
     uint64_t exp_chunk_size = PAGESIZE * 3 - sizeof(mem_chunk_t);
 
@@ -65,6 +66,7 @@ MU_TEST(test_allocate_chunk) {
 }
 
 MU_TEST(test_find_chunk) {
+    LIST_INIT(&mem_ctl.ma_chunks); // reset list
     allocate_chunk(2048);
     mem_chunk_t *chunk1 = allocate_chunk(PAGESIZE - sizeof(mem_chunk_t));
     mem_chunk_t *chunk2 = allocate_chunk(PAGESIZE * 2);
