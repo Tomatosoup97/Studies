@@ -11,6 +11,8 @@
 #define WORDSIZE __WORDSIZE
 #define PAGESIZE (getpagesize())
 #define SEPARATE_CHUNK_THRESHOLD (PAGESIZE * 4)
+#define BOTH_METADATA_SIZE (sizeof(mem_block_t) + sizeof(mem_chunk_t))
+#define CANARY_ADDR 0xDEADC0DE
 
 #define FOR_EACH_CHUNK(chunk) \
     LIST_FOREACH(chunk, &mem_ctl.ma_chunks, ma_node)
@@ -18,10 +20,13 @@
 #define FOR_EACH_FREE_BLOCK(block, chunk) \
     LIST_FOREACH(block, &chunk->ma_freeblks, mb_node)
 
+#define FST_FREE_BLK_IN_CHUNK(chunk) LIST_FIRST(&chunk->ma_freeblks)
+
 #define SND_FREE_BLK_IN_CHUNK(chunk) \
-    LIST_NEXT(LIST_FIRST(&chunk->ma_freeblks), mb_node)
+    LIST_NEXT(FST_FREE_BLK_IN_CHUNK(chunk), mb_node)
 
 #define FULL_CHUNK_SIZE(chunk) (chunk->size + sizeof(mem_chunk_t))
+#define FULL_BLOCK_SIZE(block) (block->mb_size + sizeof(mem_block_t))
 
 typedef struct mem_block {
     int32_t mb_size;                    // mb_size < 0 => allocated
@@ -45,17 +50,21 @@ typedef struct mem_chunk_block_tuple {
 } mem_chunk_block_tuple_t;
 
 size_t align_size(size_t size, size_t alignment);
-
 size_t calc_required_space(size_t size);
 
 mem_chunk_t *allocate_chunk(size_t size);
-
 mem_chunk_t *find_chunk(void *ptr);
 
 mem_chunk_block_tuple_t *find_free_block_with_size(size_t size);
+mem_block_t *create_allocated_block(mem_block_t *free_block, size_t size);
+mem_block_t *find_block(void *ptr);
+mem_block_t *allocate_mem_in_block(
+        mem_chunk_t *chunk,
+        mem_block_t *free_block,
+        size_t size
+);
 
 void free_chunk(mem_chunk_t *chunk);
-
 void dump_chunk_list();
 
 #endif

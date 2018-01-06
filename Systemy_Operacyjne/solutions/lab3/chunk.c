@@ -1,5 +1,6 @@
 #include <sys/mman.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <assert.h>
 #include "chunk.h"
 #include "queue.h"
@@ -40,7 +41,7 @@ mem_chunk_t *allocate_chunk(size_t size) {
 
     mem_block_t *initial_block = (new_chunk + sizeof(mem_chunk_t));
     initial_block->mb_size = new_chunk->size - sizeof(mem_block_t);
-    initial_block->prev_block = (void*) 0xDEADC0DE;
+    initial_block->prev_block = (void*) CANARY_ADDR;
 
     assert(initial_block->mb_size > 0);
 
@@ -52,20 +53,26 @@ mem_chunk_t *allocate_chunk(size_t size) {
     return new_chunk;
 }
 
+bool is_ptr_in_range(void *ptr, uint64_t from_addr, uint64_t interval) {
+    uint64_t target_addr = (uint64_t) ptr;
+    return target_addr > from_addr && target_addr < from_addr + interval;
+}
+
+bool is_pointer_in_chunk(mem_chunk_t *chunk, void *ptr) {
+    return is_ptr_in_range(ptr, chunk, FULL_CHUNK_SIZE(chunk));
+}
+
+bool is_pointer_in_block(mem_block_t *block, void *ptr) {
+    return is_ptr_in_range(ptr, (uint64_t) block, FULL_BLOCK_SIZE(block));
+}
+
 mem_chunk_t *find_chunk(void *ptr) {
     /* Find chunk which holds given :ptr: address. Return NULL on failure
      * */
     mem_chunk_t *chunk;
-    uint64_t target_addr = (uint64_t) ptr;
-
-    FOR_EACH_CHUNK(chunk) {
-        uint64_t chunk_addr = (uint64_t) chunk;
-        uint64_t chunk_size = FULL_CHUNK_SIZE(chunk);
-        if ( target_addr > chunk_addr &&
-             target_addr < chunk_addr + chunk_size) {
+    FOR_EACH_CHUNK(chunk)
+        if (is_pointer_in_chunk(chunk, ptr))
             return chunk;
-        }
-    }
     return NULL;
 }
 
@@ -93,6 +100,24 @@ void free_chunk(mem_chunk_t *chunk) {
     LIST_REMOVE(chunk, ma_node);
 }
 
+void *calc_block_address(mem_block_t *free_block, size_t size) {
+    // TODO: consider making it macro definition
+    return (void*) free_block + free_block->mb_size - size;
+}
+
+mem_block_t *create_allocated_block(mem_block_t *free_block, size_t size) {
+    mem_block_t *block;
+
+    block = calc_block_address(free_block, size);
+    block->prev_block = free_block;
+
+    // TODO: alignment!
+    block->mb_data[0] = (void*) block + sizeof(mem_block_t);
+    block->mb_size = (-1) * size; // when block is allocated size is negative
+
+    return block;
+}
+
 mem_block_t *allocate_mem_in_block(
         mem_chunk_t *chunk,
         mem_block_t *free_block,
@@ -101,18 +126,10 @@ mem_block_t *allocate_mem_in_block(
     assert(free_block->mb_size >= size);
     pthread_mutex_lock(&mem_ctl.mutex);
 
-    mem_block_t *allocated_block;
     size_t free_block_space_size = free_block->mb_size;
     size_t alloc_block_size = size + sizeof(mem_block_t);
 
-    allocated_block = free_block + free_block_space_size + sizeof(mem_block_t) \
-                    - alloc_block_size;
-    allocated_block->prev_block = free_block;
-
-    // TODO: alignment!
-    allocated_block->mb_data[0] = (void*) allocated_block + sizeof(mem_block_t);
-    allocated_block->mb_size = (-1) * size; // when block is allocated size is negative
-
+    mem_block_t *allocated_block = create_allocated_block(free_block, size);
     free_block->mb_size = free_block_space_size - alloc_block_size;
 
     pthread_mutex_unlock(&mem_ctl.mutex);
