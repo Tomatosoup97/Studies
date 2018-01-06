@@ -40,6 +40,7 @@ mem_chunk_t *allocate_chunk(size_t size) {
 
     mem_block_t *initial_block = (new_chunk + sizeof(mem_chunk_t));
     initial_block->mb_size = new_chunk->size - sizeof(mem_block_t);
+    initial_block->prev_block = (void*) 0xDEADC0DE;
 
     assert(initial_block->mb_size > 0);
 
@@ -68,16 +69,19 @@ mem_chunk_t *find_chunk(void *ptr) {
     return NULL;
 }
 
-mem_block_t *find_free_block_with_size(size_t size) {
+mem_chunk_block_tuple_t *find_free_block_with_size(size_t size) {
     /* Find first block that has free :size: space */
+    mem_chunk_block_tuple_t *chunk_blk_tuple;
     mem_chunk_t *chunk;
     mem_block_t *block;
 
     FOR_EACH_CHUNK(chunk)
         FOR_EACH_FREE_BLOCK(block, chunk)
-            if (block->mb_size >= size)
-                return block;
-
+            if (block->mb_size >= size) {
+                chunk_blk_tuple->block = block;
+                chunk_blk_tuple->chunk = chunk;
+                return chunk_blk_tuple;
+            }
     return NULL;
 }
 
@@ -89,19 +93,30 @@ void free_chunk(mem_chunk_t *chunk) {
     LIST_REMOVE(chunk, ma_node);
 }
 
-mem_block_t *allocate_mem_in_block(mem_block_t *free_block, size_t size) {
-    mem_block_t *alloc_block;
-
+mem_block_t *allocate_mem_in_block(
+        mem_chunk_t *chunk,
+        mem_block_t *free_block,
+        size_t size
+) {
     assert(free_block->mb_size >= size);
     pthread_mutex_lock(&mem_ctl.mutex);
 
-    alloc_block = (void*) free_block;
+    mem_block_t *allocated_block;
+    size_t free_block_space_size = free_block->mb_size;
+    size_t alloc_block_size = size + sizeof(mem_block_t);
 
-    free_block->mb_size -= size;
-    // TODO
+    allocated_block = free_block + free_block_space_size + sizeof(mem_block_t) \
+                    - alloc_block_size;
+    allocated_block->prev_block = free_block;
+
+    // TODO: alignment!
+    allocated_block->mb_data[0] = (void*) allocated_block + sizeof(mem_block_t);
+    allocated_block->mb_size = (-1) * size; // when block is allocated size is negative
+
+    free_block->mb_size = free_block_space_size - alloc_block_size;
 
     pthread_mutex_unlock(&mem_ctl.mutex);
-    return alloc_block;
+    return allocated_block;
 }
 
 void dump_chunk_list() {

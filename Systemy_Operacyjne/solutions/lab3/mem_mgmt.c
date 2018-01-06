@@ -79,6 +79,7 @@ void mdump() {
 
 int posix_memalign(void **memptr, size_t alignment, size_t size) {
     size_t aligned_size;
+    mem_chunk_block_tuple_t *chunk_blk_tuple;
     mem_block_t *free_block;
     mem_chunk_t *new_chunk;
 
@@ -95,11 +96,13 @@ int posix_memalign(void **memptr, size_t alignment, size_t size) {
     aligned_size = align_size(size, alignment);
 
     if (size <= SEPARATE_CHUNK_THRESHOLD &&
-            (free_block = find_free_block_with_size(aligned_size)) != NULL) {
-         *memptr = allocate_mem_in_block(&free_block, aligned_size);
+            (chunk_blk_tuple = find_free_block_with_size(aligned_size)) != NULL) {
+         *memptr = allocate_mem_in_block(chunk_blk_tuple->chunk,
+                                         chunk_blk_tuple->block,
+                                         aligned_size);
     } else {
         mem_chunk_t *chunk = allocate_chunk(aligned_size);
-        *memptr = allocate_mem_in_block(&chunk->ma_first, aligned_size);
+        *memptr = allocate_mem_in_block(chunk, &chunk->ma_first, aligned_size);
     }
 
     pthread_mutex_unlock(&mem_ctl.mutex);

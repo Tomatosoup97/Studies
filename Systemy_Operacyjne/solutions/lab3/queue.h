@@ -34,6 +34,7 @@
 #ifndef	_SYS_QUEUE_H_
 #define	_SYS_QUEUE_H_
 
+
 /*
  * This file defines five types of data structures: singly-linked lists,
  * lists, simple queues, tail queues, and circular queues.
@@ -199,6 +200,10 @@ struct {								\
 #define	LIST_END(head)			NULL
 #define	LIST_EMPTY(head)		((head)->lh_first == LIST_END(head))
 #define	LIST_NEXT(elm, field)		((elm)->field.le_next)
+
+#define	LIST_PREV(elm, head, field)			\
+	(((elm)->field.le_prev == &LIST_FIRST((head)) ? NULL :	\
+	    (elm)->field.le_prev))
 
 #define	LIST_FOREACH(var, head, field)					\
 	for ((var) = ((head)->lh_first);				\

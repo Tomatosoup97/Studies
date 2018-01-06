@@ -20,6 +20,7 @@ mem_mgmt.o:
 chunk.o:
 	$(CC) $(CFLAGS) -c chunk.c chunk.h
 
+
 clean:
 	rm -vf $(BINS)
 	rm -vf *.o

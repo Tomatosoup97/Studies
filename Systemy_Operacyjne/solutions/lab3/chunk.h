@@ -39,6 +39,11 @@ typedef struct mem_chunk {
     mem_block_t *ma_first;              // first block in the chunk
 } mem_chunk_t;
 
+typedef struct mem_chunk_block_tuple {
+    mem_block_t *block;
+    mem_chunk_t *chunk;
+} mem_chunk_block_tuple_t;
+
 size_t align_size(size_t size, size_t alignment);
 
 size_t calc_required_space(size_t size);
@@ -47,7 +52,7 @@ mem_chunk_t *allocate_chunk(size_t size);
 
 mem_chunk_t *find_chunk(void *ptr);
 
-mem_block_t *find_free_block_with_size(size_t size);
+mem_chunk_block_tuple_t *find_free_block_with_size(size_t size);
 
 void free_chunk(mem_chunk_t *chunk);
 

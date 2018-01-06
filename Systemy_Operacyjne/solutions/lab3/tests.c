@@ -4,6 +4,7 @@
 #include "minunit.h"
 #include "mem_mgmt.h"
 #include "chunk.h"
+#include "queue.h"
 
 extern mem_ctl_t mem_ctl;
 
@@ -81,19 +82,21 @@ MU_TEST(test_find_chunk) {
 MU_TEST(test_find_free_block_with_size) {
     LIST_INIT(&mem_ctl.ma_chunks); // reset list
 
-    mem_chunk_t *chunk1 = allocate_chunk(PAGESIZE);
-    mem_chunk_t *chunk2 = allocate_chunk(PAGESIZE*3);
-    mem_chunk_t *chunk3 = allocate_chunk(256);
+    allocate_chunk(PAGESIZE);
+    mem_chunk_t *expected_chunk = allocate_chunk(PAGESIZE*3);
+    allocate_chunk(256);
 
-    mu_check(find_free_block_with_size(PAGESIZE*2) == chunk2->ma_first);
+    mem_chunk_block_tuple_t *result = find_free_block_with_size(PAGESIZE*2);
+    mu_check(result->chunk == expected_chunk);
+    mu_check(result->block == expected_chunk->ma_first);
 }
 
 MU_TEST(test_find_free_block_with_size__return_null_when_no_block_found) {
     LIST_INIT(&mem_ctl.ma_chunks); // reset list
 
-    mem_chunk_t *chunk1 = allocate_chunk(PAGESIZE);
-    mem_chunk_t *chunk2 = allocate_chunk(PAGESIZE * 3 - sizeof(mem_chunk_t));
-    mem_chunk_t *chunk3 = allocate_chunk(256);
+    allocate_chunk(PAGESIZE);
+    allocate_chunk(PAGESIZE * 3 - sizeof(mem_chunk_t));
+    allocate_chunk(256);
 
     mu_check(find_free_block_with_size(PAGESIZE * 3) == NULL);
 }
