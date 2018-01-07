@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>
+#include <assert.h>
 #include "minunit.h"
 #include "mem_mgmt.h"
 #include "chunk.h"
@@ -61,6 +62,8 @@ MU_TEST(test_allocate_chunk) {
 
     mu_check(chunk->size == exp_chunk_size);
     mu_check(chunk->ma_first->mb_size == exp_fst_blk_size);
+    mu_check(chunk->ma_first->magic_val == CANARY_ADDR);
+    mu_check(chunk->ma_first->prev_block == NULL);
     mu_check(LIST_FIRST(&chunk->ma_freeblks)->mb_size == chunk->ma_first->mb_size);
     mu_check(SND_FREE_BLK_IN_CHUNK(chunk) == NULL);
 }
@@ -130,6 +133,7 @@ MU_TEST(test_create_allocated_block) {
 
     mu_check(alloc_block->mb_size == -256);
     mu_check(alloc_block->prev_block == free_block);
+    mu_check(alloc_block->magic_val == CANARY_ADDR);
     mu_check((void*) alloc_block == \
              (void*) free_block + PAGESIZE - BOTH_METADATA_SIZE - 256);
 }

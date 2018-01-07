@@ -19,6 +19,16 @@ size_t calc_required_space(size_t size) {
     return align_size(required_space, PAGESIZE);
 }
 
+mem_block_t *create_initial_free_block(mem_chunk_t *chunk) {
+    mem_block_t *initial_block = (mem_block_t*) (chunk + sizeof(mem_chunk_t));
+    SET_CANARY(initial_block);
+    initial_block->mb_size = chunk->size - sizeof(mem_block_t);
+    initial_block->prev_block = NULL;
+
+    assert(initial_block->mb_size > 0);
+    return initial_block;
+}
+
 mem_chunk_t *allocate_chunk(size_t size) {
     /* Allocate new chunk of size :size: and create one free block
      * */
@@ -38,12 +48,7 @@ mem_chunk_t *allocate_chunk(size_t size) {
     }
 
     new_chunk->size = required_space - sizeof(mem_chunk_t);
-
-    mem_block_t *initial_block = (mem_block_t*) (new_chunk + sizeof(mem_chunk_t));
-    initial_block->mb_size = new_chunk->size - sizeof(mem_block_t);
-    initial_block->prev_block = NULL;
-
-    assert(initial_block->mb_size > 0);
+    mem_block_t *initial_block = create_initial_free_block(new_chunk);
 
     new_chunk->ma_first = initial_block;
     LIST_INSERT_HEAD(&new_chunk->ma_freeblks, initial_block, mb_node);
@@ -85,6 +90,7 @@ mem_chunk_block_tuple_t *find_free_block_with_size(size_t size) {
     FOR_EACH_CHUNK(chunk)
         FOR_EACH_FREE_BLOCK(block, chunk)
             if (block->mb_size >= (int32_t) size) {
+                CANARY_CHECK(block);
                 chunk_blk_tuple->block = block;
                 chunk_blk_tuple->chunk = chunk;
                 return chunk_blk_tuple;
@@ -106,10 +112,12 @@ void *calc_block_address(mem_block_t *free_block, size_t size) {
 }
 
 mem_block_t *create_allocated_block(mem_block_t *free_block, size_t size) {
+    CANARY_CHECK(free_block);
     mem_block_t *block;
 
     block = calc_block_address(free_block, size);
     block->prev_block = free_block;
+    SET_CANARY(block);
 
     // TODO: alignment!
     block->mb_data[0] = (uint64_t) (block + sizeof(mem_block_t));
@@ -123,6 +131,7 @@ mem_block_t *allocate_mem_in_block(
         mem_block_t *free_block,
         size_t size
 ) {
+    CANARY_CHECK(free_block);
     assert(free_block->mb_size >= (int32_t) size);
     pthread_mutex_lock(&mem_ctl.mutex);
 
@@ -140,7 +149,7 @@ mem_block_t *get_first_block(mem_block_t *starting_block) {
     mem_block_t *block = starting_block;
 
     while (block->prev_block != NULL)
-        block = block->prev_block;
+        block = GET_PREV_BLOCK(block);
 
     return block;
 }
@@ -149,21 +158,29 @@ mem_block_t *find_fst_prev_free_block(mem_block_t *starting_block) {
     mem_block_t *block = starting_block->prev_block;
 
     while (!IS_BLOCK_FREE(block) && block != NULL)
-        block = block->prev_block;
+        block = GET_PREV_BLOCK(block);
 
     return block;
 }
 
 mem_block_t *find_block(void *ptr) {
-    return container_of(ptr, mem_block_t, mb_data);
+    mem_block_t *block = container_of(ptr, mem_block_t, mb_data);
+    CANARY_VALID_OR_NULL(block);
+    return block;
 }
 
 void left_coalesce_blocks(mem_block_t *left_block, mem_block_t *block) {
+    pthread_mutex_lock(&mem_ctl.mutex);
+
     assert(IS_BLOCK_FREE(left_block) && IS_BLOCK_FREE(block));
     left_block->mb_size += FULL_BLOCK_SIZE(block);
+
+    pthread_mutex_unlock(&mem_ctl.mutex);
 }
 
 void right_coalesce_blocks(mem_block_t *block, mem_block_t *right_block) {
+    pthread_mutex_lock(&mem_ctl.mutex);
+
     assert(IS_BLOCK_FREE(block) && IS_BLOCK_FREE(right_block));
     mem_block_t *next_block = LIST_NEXT(right_block, mb_node);
 
@@ -171,15 +188,18 @@ void right_coalesce_blocks(mem_block_t *block, mem_block_t *right_block) {
 
     LIST_REMOVE(right_block, mb_node);
     LIST_INSERT_BEFORE(next_block, block, mb_node);
+
+    pthread_mutex_unlock(&mem_ctl.mutex);
 }
 
 void free_block(void *ptr) {
+    pthread_mutex_lock(&mem_ctl.mutex);
     mem_chunk_t *chunk = find_chunk(ptr);
     mem_block_t *block = find_block(ptr);
 
     block->mb_size *= (-1); // mark size as free
 
-    mem_block_t *prev_block = block->prev_block;
+    mem_block_t *prev_block = GET_PREV_BLOCK(block);
 
     if (prev_block != NULL && IS_BLOCK_FREE(prev_block))
         // check left coalescing
@@ -195,22 +215,29 @@ void free_block(void *ptr) {
         mem_block_t *prev_free_block = find_fst_prev_free_block(block);
         LIST_INSERT_AFTER(prev_free_block, block, mb_node);
     }
+    pthread_mutex_unlock(&mem_ctl.mutex);
 }
 
 void dump_chunk_list() {
-    /* Output chunk list and its free blocks */
+    /* Output chunk list and its free blocks. Additionally, check if canaries
+     * in blocks are valid.
+     * */
     mem_chunk_t *chunk;
     mem_block_t *block;
+    pthread_mutex_lock(&mem_ctl.mutex);
 
     printf("\nFormat: [chunk size] :: [fst free blk size] -> ... -> [nth free blk size]\n\n");
 
     FOR_EACH_CHUNK(chunk) {
         printf("[%d] :: ", chunk->size);
         FOR_EACH_FREE_BLOCK(block, chunk) {
+            CANARY_CHECK(block);
             printf("[%d]", block->mb_size);
             if (LIST_NEXT(block, mb_node) != NULL) printf(" -> ");
         }
         if (LIST_NEXT(chunk, ma_node) != NULL) printf("\n|\n");
     }
     printf("\n");
+
+    pthread_mutex_unlock(&mem_ctl.mutex);
 }

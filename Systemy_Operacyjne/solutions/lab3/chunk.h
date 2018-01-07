@@ -3,21 +3,40 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <assert.h>
 #include <unistd.h>
 #include <limits.h>
 #include "queue.h"
 #include "mem_mgmt.h"
 
+/* CONSTANTS */
 #define WORDSIZE __WORDSIZE
 #define PAGESIZE (getpagesize())
 #define SEPARATE_CHUNK_THRESHOLD (PAGESIZE * 4)
 #define BOTH_METADATA_SIZE (sizeof(mem_block_t) + sizeof(mem_chunk_t))
 #define CANARY_ADDR 0xDEADC0DE
 
+/* CANARY CHECKS */
+#define IS_CANARY_VALID(block) (block->magic_val == CANARY_ADDR)
+#define CANARY_CHECK(block) assert(IS_CANARY_VALID(block))
+#define SET_CANARY(block) (block->magic_val = CANARY_ADDR)
+#define CANARY_VALID_OR_NULL(block) assert(block == NULL || IS_CANARY_VALID(block))
+
+/* BLOCK OPERATIONS */
 #define FULL_CHUNK_SIZE(chunk) (chunk->size + sizeof(mem_chunk_t))
 #define FULL_BLOCK_SIZE(block) (block->mb_size + sizeof(mem_block_t))
 #define IS_BLOCK_FREE(block) (block->mb_size > 0)
-#define GET_NEXT_BLOCK(block) (block + FULL_BLOCK_SIZE(block))
+
+#define GET_NEXT_BLOCK(block) ({\
+    mem_block_t *next_block = block + FULL_BLOCK_SIZE(block); \
+    CANARY_VALID_OR_NULL(next_block); \
+    block; })
+
+#define GET_PREV_BLOCK(block) ({ \
+    mem_block_t *prev_block  = block->prev_block; \
+    CANARY_VALID_OR_NULL(prev_block); \
+    prev_block; })
+
 #define FST_FREE_BLK_IN_CHUNK(chunk) LIST_FIRST(&chunk->ma_freeblks)
 
 #define SND_FREE_BLK_IN_CHUNK(chunk) \
@@ -26,19 +45,22 @@
 #define IS_LAST_BLOCK(chunk, block) ( \
     (void*) (block + FULL_BLOCK_SIZE(block)) >= (void*)(chunk + FULL_CHUNK_SIZE(chunk)))
 
+/* LIST LOOPING HELPERS */
 #define FOR_EACH_CHUNK(chunk) \
     LIST_FOREACH(chunk, &mem_ctl.ma_chunks, ma_node)
 
 #define FOR_EACH_FREE_BLOCK(block, chunk) \
     LIST_FOREACH(block, &chunk->ma_freeblks, mb_node)
 
+/* GET CONTAINER BY POINTER TO DATA */
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
-
 #define container_of(ptr, type, member) ({                      \
         const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
         (type *)( (char *)__mptr - offsetof(type,member) );})
 
 typedef struct mem_block {
+    uint64_t magic_val;                 // Used for canary checks
+
     int32_t mb_size;                    // mb_size < 0 => allocated
     void *prev_block;
     union {
