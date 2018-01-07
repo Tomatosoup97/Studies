@@ -96,7 +96,7 @@ void free_chunk(mem_chunk_t *chunk);
 void left_coalesce_blocks(mem_chunk_t *chunk, mem_block_t *left_block,
                           mem_block_t *block);
 void right_coalesce_blocks(mem_block_t *block, mem_block_t *right_block);
-void free_block(void *ptr);
+void free_block(mem_chunk_t *chunk, void *ptr);
 
 mem_chunk_block_tuple_t *find_free_block_with_size(size_t size);
 mem_block_t *create_allocated_block(mem_block_t *free_block, size_t size);

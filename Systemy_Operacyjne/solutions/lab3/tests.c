@@ -18,27 +18,6 @@ void test_teardown(void) {
     // TODO: deallocate memory?
 }
 
-/* TEST MEM_MGMT */
-
-MU_TEST(test_malloc_return_null_on_failure_and_set_proper_errno) {
-    void *ptr = malloc(0xFFFFFFFFF);
-    mu_check(ptr == NULL);
-    mu_check(errno == ENOMEM);
-}
-
-MU_TEST(test_posix_memalign_return_error_on_invalid_alignment) {
-    void **ptr = NULL;
-    mu_check(posix_memalign(ptr, sizeof(void*)-1, 128) == EINVAL);
-    mu_check(posix_memalign(ptr, 200, 128) == EINVAL);
-}
-
-MU_TEST(is_power_of_two) {
-    mu_check(IS_POWER_OF_TWO(64));
-    mu_check(IS_POWER_OF_TWO(16));
-    mu_check(!IS_POWER_OF_TWO(63));
-    mu_check(!IS_POWER_OF_TWO(15));
-}
-
 /* TEST CHUNK OPERATIONS */
 
 MU_TEST(test_align_size) {
@@ -198,13 +177,13 @@ MU_TEST(test_find_fst_prev_free_block) {
     mu_check(find_fst_prev_free_block(block_right) == block_left);
     mu_check(find_fst_prev_free_block(block_mid) == block_left);
 
-    free_block(block_right->mb_data);
+    free_block(chunk, block_right->mb_data);
     mu_check(find_fst_prev_free_block(block_right) == block_left);
 
     mu_check(find_fst_prev_free_block(block_last) == block_right);
 
-//     [ block_left                           | block_last ]
-    free_block(block_mid->mb_data);
+    // [ block_left                           | block_last ]
+    free_block(chunk, block_mid->mb_data);
 
     mu_check(find_fst_prev_free_block(block_last) == block_left);
 }
@@ -279,19 +258,19 @@ MU_TEST(test_free_block) {
 
     mu_check(block_left->mb_size == initial_blk_size - alloc_bloc_size*3);
 
-    free_block(block_mid->mb_data);
+    free_block(chunk, block_mid->mb_data);
 
     mu_check(FST_FREE_BLK_IN_CHUNK(chunk) == block_left);
     mu_check(SND_FREE_BLK_IN_CHUNK(chunk) == NULL);
     mu_check(block_left->mb_size == initial_blk_size - alloc_bloc_size*2);
     mu_check(!IS_BLOCK_FREE(block_right) && !IS_BLOCK_FREE(block_last));
 
-    free_block(block_last->mb_data);
+    free_block(chunk, block_last->mb_data);
 
     mu_check(SND_FREE_BLK_IN_CHUNK(chunk) == block_last);
     mu_check(block_left->mb_size == initial_blk_size - alloc_bloc_size*2);
 
-    free_block(block_right->mb_data);
+    free_block(chunk, block_right->mb_data);
 
     mu_check(FST_FREE_BLK_IN_CHUNK(chunk) == block_left);
     mu_check(SND_FREE_BLK_IN_CHUNK(chunk) == NULL);
@@ -299,14 +278,114 @@ MU_TEST(test_free_block) {
     mu_check(block_left->mb_size == initial_blk_size);
 }
 
+/* TEST MEM_MGMT */
+
+MU_TEST(test_posix_memalign_return_error_on_invalid_alignment) {
+    void **ptr = NULL;
+    mu_check(foo_posix_memalign(ptr, sizeof(void*)-1, 128) == EINVAL);
+    mu_check(foo_posix_memalign(ptr, 200, 128) == EINVAL);
+}
+
+MU_TEST(test_is_power_of_two) {
+    mu_check(IS_POWER_OF_TWO(64));
+    mu_check(IS_POWER_OF_TWO(16));
+    mu_check(!IS_POWER_OF_TWO(63));
+    mu_check(!IS_POWER_OF_TWO(15));
+}
+
+MU_TEST(test_free) {
+    // [block_left | block_mid | block_right ]
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*5 - sizeof(mem_chunk_t));
+    mem_block_t *block_left = chunk->ma_first;
+    mem_block_t *block_right = allocate_mem_in_block(chunk, block_left, 256);
+    mem_block_t *block_mid = allocate_mem_in_block(chunk, block_left, 256);
+    int32_t initial_block_left_size = block_left->mb_size;
+
+    foo_free(block_right->mb_data);
+
+    mu_check(SND_FREE_BLK_IN_CHUNK(chunk) == block_right);
+    mu_check(initial_block_left_size == block_left->mb_size);
+    mu_check(LIST_FIRST(&mem_ctl.ma_chunks) == chunk);
+
+    foo_free(block_mid->mb_data);
+
+    mu_check(LIST_FIRST(&mem_ctl.ma_chunks) == NULL);
+}
+
+MU_TEST(test_malloc) {
+    int array_size = 21;
+    char *array = foo_malloc(array_size * sizeof(char));
+    array = "THIS IS AN EX-PARROT!";
+
+    mdump();
+    printf("%s\n", array);
+    printf("\nchar: %c", array[20]);
+    array[2] = 'D';
+    // reverse string
+    for (int i=array_size-1; i >= 0; i++)
+        array[i] = array[array_size - i - 1];
+
+    mu_check(array == "!TORRAP-XE NA SI SIHT");
+    mu_check(LIST_FIRST(&mem_ctl.ma_chunks) != NULL);
+
+    foo_free(array);
+
+    mu_check(LIST_FIRST(&mem_ctl.ma_chunks) == NULL);
+}
+
+MU_TEST(test_calloc_fills_memory_with_zero) {
+    char *array = foo_calloc(10, sizeof(char));
+
+    for (int i=0; i<10; i++) {
+        mu_check(array[i] == 0);
+    }
+
+    foo_free(array);
+}
+
+MU_TEST(test_calloc) {
+    typedef struct point {
+        int x;
+        int y;
+    } point_t;
+
+    int32_t points_count = 4;
+    point_t *points = foo_calloc(points_count, sizeof(point_t));
+    int *results = foo_calloc(points_count, sizeof(int));
+
+    int xs[4] = {2, 4, 8, 42};
+    int ys[4] = {4, 1, 3, 1};
+
+    for (int i=0; i < points_count; i++) {
+        points->x = xs[i];
+        points->y = ys[i];
+        results[i] = points->x * points->y;
+    }
+
+    int expected_results[4] = {8, 4, 24, 42};
+    for (int i=0; i < points_count; i++)
+        mu_check(results[i] == expected_results[i]);
+
+    mem_chunk_t *chunk = find_chunk(results);
+    mem_block_t *results_block = find_block(results);
+    mem_block_t *points_block = find_block(points);
+
+    mu_check(chunk == find_chunk(points));
+    mu_check(results_block->mb_size == 64);
+    mu_check(points_block->mb_size == 64);
+    mu_check(GET_NEXT_BLOCK(chunk, chunk->ma_first) == results_block);
+    mu_check(GET_NEXT_BLOCK(chunk, results_block) == points_block);
+
+    foo_free(results);
+    mu_check(LIST_FIRST(&mem_ctl.ma_chunks) != NULL);
+    foo_free(points);
+
+    mu_check(LIST_FIRST(&mem_ctl.ma_chunks) == NULL);
+}
+
 /* CONFIG */
 
 MU_TEST_SUITE(test_suite) {
-    /* TEST MEM_MGMT */
-    MU_RUN_TEST(test_malloc_return_null_on_failure_and_set_proper_errno);
-    MU_RUN_TEST(test_posix_memalign_return_error_on_invalid_alignment);
-    MU_RUN_TEST(is_power_of_two);
-
     /* TEST CHUNK */
     MU_RUN_TEST(test_calc_space_required);
     MU_RUN_TEST(test_allocate_chunk);
@@ -319,14 +398,25 @@ MU_TEST_SUITE(test_suite) {
     MU_RUN_TEST(test_find_free_block_with_size__return_null_when_no_block_found);
     MU_RUN_TEST(test_find_fst_prev_free_block);
     MU_RUN_TEST(test_find_block);
+
     MU_RUN_TEST(test_create_allocated_block);
     MU_RUN_TEST(test_allocate_mem_in_block);
+    MU_RUN_TEST(test_get_first_block);
+
     MU_RUN_TEST(test_left_coalesce_blocks);
     MU_RUN_TEST(test_left_coalesce_blocks__more_blocks);
     MU_RUN_TEST(test_right_coalesce_blocks__one_free_block);
     MU_RUN_TEST(test_right_coalesce_blocks);
-    MU_RUN_TEST(test_get_first_block);
+
     MU_RUN_TEST(test_free_block);
+
+    /* TEST MEM_MGMT */
+    MU_RUN_TEST(test_posix_memalign_return_error_on_invalid_alignment);
+    MU_RUN_TEST(test_is_power_of_two);
+    MU_RUN_TEST(test_free);
+    MU_RUN_TEST(test_malloc);
+    MU_RUN_TEST(test_calloc_fills_memory_with_zero);
+    MU_RUN_TEST(test_calloc);
 }
 
 int main() {

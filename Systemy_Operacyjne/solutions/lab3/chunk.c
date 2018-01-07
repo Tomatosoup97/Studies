@@ -217,9 +217,8 @@ void right_coalesce_blocks(mem_block_t *left_block, mem_block_t *right_block) {
     pthread_mutex_unlock(&mem_ctl.mutex);
 }
 
-void free_block(void *ptr) {
+void free_block(mem_chunk_t *chunk, void *ptr) {
     pthread_mutex_lock(&mem_ctl.mutex);
-    mem_chunk_t *chunk = find_chunk(ptr);
     mem_block_t *block = find_block(ptr);
     assert(block != NULL && IS_CANARY_VALID(block));
 

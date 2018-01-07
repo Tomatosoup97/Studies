@@ -13,13 +13,11 @@ mem_ctl_t mem_ctl = {
     PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP,
 };
 
-void *my_malloc(size_t size) {
-    // TODO: test
+void *foo_malloc(size_t size) {
     void *ptr;
-    int res;
-
     pthread_mutex_lock(&mem_ctl.mutex);
-    res = posix_memalign(&ptr, WORDSIZE, size);
+
+    int res = foo_posix_memalign(&ptr, WORDSIZE, size);
     if (res == ENOMEM) errno = ENOMEM;
 
     pthread_mutex_unlock(&mem_ctl.mutex);
@@ -34,7 +32,7 @@ void zero_init_memory(void *ptr, int32_t size) {
         memory[i] = 0;
 }
 
-void *calloc(size_t count, size_t size) {
+void *foo_calloc(size_t count, size_t size) {
     // TODO: test
     void *ptr;
 
@@ -48,8 +46,7 @@ void *calloc(size_t count, size_t size) {
     return ptr;
 }
 
-void *realloc(void *ptr, size_t size) {
-    // change size of em block pointed to by *ptr*
+void *foo_realloc(void *ptr, size_t size) {
     if (size == 0) {
         free(ptr);
         return NULL;
@@ -65,26 +62,30 @@ void *realloc(void *ptr, size_t size) {
     return NULL;
 }
 
-void free(void *ptr) {
-//    mem_chunk_t *chunk;
-
+void foo_free(void *ptr) {
     if (ptr == NULL)
         return;
+
     pthread_mutex_lock(&mem_ctl.mutex);
 
-//    chunk = find_chunk(ptr);
-    // TODO: implement
+    mem_chunk_t *chunk = find_chunk(ptr);
+    free_block(chunk, ptr);
+
+    if (IS_LAST_BLOCK(chunk, chunk->ma_first)) {
+        assert(IS_BLOCK_FREE(chunk->ma_first));
+        free_chunk(chunk);
+    }
 
     pthread_mutex_unlock(&mem_ctl.mutex);
 }
 
 void mdump() {
-    // dump current memory manager state
+    /* Dump current memory manager state */
     dump_chunks_all_blocks();
 }
 
 
-int posix_memalign(void **memptr, size_t alignment, size_t size) {
+int foo_posix_memalign(void **memptr, size_t alignment, size_t size) {
     size_t aligned_size;
     mem_chunk_block_tuple_t *chunk_blk_tuple;
 
@@ -104,10 +105,10 @@ int posix_memalign(void **memptr, size_t alignment, size_t size) {
             (chunk_blk_tuple = find_free_block_with_size(aligned_size)) != NULL) {
          *memptr = allocate_mem_in_block(chunk_blk_tuple->chunk,
                                          chunk_blk_tuple->block,
-                                         aligned_size);
+                                         aligned_size)->mb_data;
     } else {
         mem_chunk_t *chunk = allocate_chunk(aligned_size);
-        *memptr = allocate_mem_in_block(chunk, chunk->ma_first, aligned_size);
+        *memptr = allocate_mem_in_block(chunk, chunk->ma_first, aligned_size)->mb_data;
     }
 
     pthread_mutex_unlock(&mem_ctl.mutex);
