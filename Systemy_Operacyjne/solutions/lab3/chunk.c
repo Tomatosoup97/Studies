@@ -41,7 +41,7 @@ mem_chunk_t *allocate_chunk(size_t size) {
 
     mem_block_t *initial_block = (new_chunk + sizeof(mem_chunk_t));
     initial_block->mb_size = new_chunk->size - sizeof(mem_block_t);
-    initial_block->prev_block = (void*) CANARY_ADDR;
+    initial_block->prev_block = NULL;
 
     assert(initial_block->mb_size > 0);
 
@@ -134,6 +134,66 @@ mem_block_t *allocate_mem_in_block(
 
     pthread_mutex_unlock(&mem_ctl.mutex);
     return allocated_block;
+}
+
+mem_block_t *get_first_block(mem_block_t *starting_block) {
+    mem_block_t *block = starting_block;
+
+    while (block->prev_block != NULL)
+        block = block->prev_block;
+
+    return block;
+}
+
+mem_block_t *find_fst_prev_free_block(mem_block_t *starting_block) {
+    mem_block_t *block = starting_block->prev_block;
+
+    while (!IS_BLOCK_FREE(block) && block != NULL)
+        block = block->prev_block;
+
+    return block;
+}
+
+mem_block_t *find_block(void *ptr) {
+    return &(container_of(ptr, mem_block_t, mb_data));
+}
+
+mem_block_t *left_coalesce_blocks(mem_block_t *left_block, mem_block_t *block) {
+    assert(IS_BLOCK_FREE(left_block) && IS_BLOCK_FREE(block));
+    left_block->mb_size += FULL_BLOCK_SIZE(block);
+}
+
+mem_block_t *right_coalesce_blocks(mem_block_t *block, mem_block_t *right_block) {
+    assert(IS_BLOCK_FREE(block) && IS_BLOCK_FREE(right_block));
+    mem_block_t *next_block = LIST_NEXT(right_block, mb_node);
+
+    block->mb_size += FULL_BLOCK_SIZE(right_block);
+
+    LIST_REMOVE(right_block, mb_node);
+    LIST_INSERT_BEFORE(next_block, block, mb_node);
+}
+
+void free_block(void *ptr) {
+    mem_chunk_t *chunk = find_chunk(ptr);
+    mem_block_t *block = find_block(ptr);
+    block->mb_size *= (-1); // mark size as free
+
+    mem_block_t *prev_block = block->prev_block;
+
+    if (prev_block != NULL && IS_BLOCK_FREE(prev_block))
+        // check left coalescing
+        left_coalesce_blocks(prev_block, block);
+
+    if (!IS_LAST_BLOCK(chunk, block)) {
+        // check right coalescing
+        mem_block_t *next_block = GET_NEXT_BLOCK(block);
+        if (next_block != NULL && IS_BLOCK_FREE(next_block))
+            right_coalesce_blocks(block, next_block);
+    } else {
+        // No coalescing, attach to list
+        mem_block_t *prev_free_block = find_fst_prev_free_block(block);
+        LIST_INSERT_AFTER(prev_free_block, block, mb_node);
+    }
 }
 
 void dump_chunk_list() {

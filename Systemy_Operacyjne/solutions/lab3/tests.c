@@ -138,13 +138,116 @@ MU_TEST(test_allocate_mem_in_block) {
     size_t alloc_size = 256;
     mem_chunk_t *chunk = allocate_chunk(PAGESIZE - sizeof(mem_chunk_t));
     mem_block_t *free_block = chunk->ma_first;
-    allocate_mem_in_block(chunk, free_block, alloc_size);
+    mem_block_t *alloc_block = allocate_mem_in_block(chunk, free_block, alloc_size);
 
-    mu_check(free_block->prev_block == CANARY_ADDR);
+    mu_check(IS_LAST_BLOCK(chunk, alloc_block));
+    mu_check(!IS_LAST_BLOCK(chunk, free_block));
+
+    mu_check(free_block->prev_block == NULL);
     mu_check(FST_FREE_BLK_IN_CHUNK(chunk) == free_block);
     mu_check(SND_FREE_BLK_IN_CHUNK(chunk) == NULL);
     mu_check(free_block->mb_size == \
              PAGESIZE - BOTH_METADATA_SIZE - sizeof(mem_block_t) - alloc_size);
+}
+
+MU_TEST(test_find_block) {
+    LIST_INIT(&mem_ctl.ma_chunks); // reset list
+    allocate_chunk(2048);
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE - sizeof(mem_chunk_t));
+    allocate_chunk(PAGESIZE * 2);
+    allocate_chunk(512);
+
+    mu_check(find_block((void*) chunk + BOTH_METADATA_SIZE + 16) == chunk->ma_first);
+    mu_check(find_block((void*) chunk + PAGESIZE - 1) == chunk->ma_first);
+    mu_check(find_block((void*) 0xFFFFFFFF) == NULL);
+}
+
+MU_TEST(test_left_coalesce_blocks) {
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*2 - sizeof(mem_chunk_t));
+    mem_block_t *free_block = chunk->ma_first;
+    mem_block_t *alloc_block = allocate_mem_in_block(chunk, free_block, 256);
+    alloc_block->mb_size *= (-1);
+
+    left_coalesce_blocks(free_block, alloc_block);
+    mu_check(FST_FREE_BLK_IN_CHUNK(chunk)->mb_size == PAGESIZE*2 - BOTH_METADATA_SIZE);
+    mu_check(IS_LAST_BLOCK(chunk, free_block));
+}
+
+MU_TEST(test_right_coalesce_blocks) {
+    // [ block_left | block_mid | block_right ]
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*5 - sizeof(mem_chunk_t));
+    mem_block_t *block_left = chunk->ma_first;
+    mem_block_t *block_right = allocate_mem_in_block(chunk, block_left, 256);
+    mem_block_t *block_mid = allocate_mem_in_block(chunk, block_left, 256);
+
+    free_block(block_right->mb_data);
+    right_coalesce_blocks(block_mid, block_right);
+
+    mu_check(SND_FREE_BLK_IN_CHUNK(chunk) == block_mid);
+    mu_check(LIST_NEXT(block_mid, mb_node) == NULL);
+    mu_check(IS_LAST_BLOCK(chunk, block_mid));
+    mu_check(block_mid->mb_size == 256 + FULL_BLOCK_SIZE(block_right));
+}
+
+MU_TEST(test_get_first_block) {
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*5 - sizeof(mem_chunk_t));
+    mem_block_t *free_block = chunk->ma_first;
+    mem_block_t *alloc_block1 = allocate_mem_in_block(chunk, free_block, 256);
+    mem_block_t *alloc_block2 = allocate_mem_in_block(chunk, free_block, 256);
+    mem_block_t *alloc_block3 = allocate_mem_in_block(chunk, free_block, 256);
+
+    mu_check(get_first_block(alloc_block1) == free_block);
+    mu_check(get_first_block(alloc_block2) == free_block);
+    mu_check(get_first_block(alloc_block3) == free_block);
+}
+
+MU_TEST(test_find_fst_prev_free_block) {
+    // [ block_left | block_mid | block_right | block_last ]
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*5 - sizeof(mem_chunk_t));
+    mem_block_t *block_left = chunk->ma_first;
+    mem_block_t *block_last = allocate_mem_in_block(chunk, block_left, 256);
+    mem_block_t *block_right = allocate_mem_in_block(chunk, block_left, 256);
+    mem_block_t *block_mid = allocate_mem_in_block(chunk, block_left, 256);
+
+    mu_check(find_fst_prev_free_block(block_left) == NULL);
+    mu_check(find_fst_prev_free_block(block_right) == block_left);
+
+    free_block(block_right->mb_data);
+    free_block(block_mid->mb_data);
+
+    mu_check(find_fst_prev_free_block(block_last) == block_left);
+}
+
+MU_TEST(test_free_block) {
+    // [ block_left | block_mid | block_right | block_last ]
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*5 - sizeof(mem_chunk_t));
+    mem_block_t *block_left = chunk->ma_first;
+    mem_block_t *block_last = allocate_mem_in_block(chunk, block_left, 256);
+    mem_block_t *block_right = allocate_mem_in_block(chunk, block_left, 256);
+    mem_block_t *block_mid = allocate_mem_in_block(chunk, block_left, 256);
+    size_t initial_blk_size = PAGESIZE*5 - sizeof(mem_chunk_t);
+    size_t alloc_bloc_size = FULL_BLOCK_SIZE(block_right);
+
+    mu_check(block_left->mb_size == initial_blk_size - alloc_bloc_size*3);
+
+    free_block(block_mid);
+
+    mu_check(FST_FREE_BLK_IN_CHUNK(chunk) == block_left);
+    mu_check(SND_FREE_BLK_IN_CHUNK(chunk) == NULL);
+    mu_check(block_left->mb_size == initial_blk_size - alloc_bloc_size*2);
+    mu_check(!IS_BLOCK_FREE(block_right) && !IS_BLOCK_FREE(block_last));
+
+    free_block(block_last);
+
+    mu_check(SND_FREE_BLK_IN_CHUNK(chunk) == block_last);
+    mu_check(block_left->mb_size == initial_blk_size - alloc_bloc_size*2);
+
+    free_block(block_right);
+
+    mu_check(FST_FREE_BLK_IN_CHUNK(chunk) == block_left);
+    mu_check(SND_FREE_BLK_IN_CHUNK(chunk) == NULL);
+    mu_check(IS_LAST_BLOCK(chunk, block_left));
+    mu_check(block_left->mb_size == initial_blk_size);
 }
 
 /* CONFIG */
@@ -167,7 +270,12 @@ MU_TEST_SUITE(test_suite) {
     MU_RUN_TEST(test_find_free_block_with_size__return_null_when_no_block_found);
     MU_RUN_TEST(test_create_allocated_block);
     MU_RUN_TEST(test_allocate_mem_in_block);
-
+    MU_RUN_TEST(test_find_block);
+    MU_RUN_TEST(test_left_coalesce_blocks);
+    MU_RUN_TEST(test_right_coalesce_blocks);
+    MU_RUN_TEST(test_get_first_block);
+    MU_RUN_TEST(test_find_fst_prev_free_block);
+    MU_RUN_TEST(test_free_block);
 }
 
 int main() {

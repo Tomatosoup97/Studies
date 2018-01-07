@@ -14,19 +14,29 @@
 #define BOTH_METADATA_SIZE (sizeof(mem_block_t) + sizeof(mem_chunk_t))
 #define CANARY_ADDR 0xDEADC0DE
 
+#define FULL_CHUNK_SIZE(chunk) (chunk->size + sizeof(mem_chunk_t))
+#define FULL_BLOCK_SIZE(block) (block->mb_size + sizeof(mem_block_t))
+#define IS_BLOCK_FREE(block) (block->mb_size > 0)
+#define GET_NEXT_BLOCK(block) (block + FULL_BLOCK_SIZE(block))
+#define FST_FREE_BLK_IN_CHUNK(chunk) LIST_FIRST(&chunk->ma_freeblks)
+
+#define SND_FREE_BLK_IN_CHUNK(chunk) \
+    LIST_NEXT(FST_FREE_BLK_IN_CHUNK(chunk), mb_node)
+
+#define IS_LAST_BLOCK(chunk, block) ( \
+    (block + FULL_BLOCK_SIZE(block)) >= (chunk + FULL_CHUNK_SIZE(chunk)))
+
 #define FOR_EACH_CHUNK(chunk) \
     LIST_FOREACH(chunk, &mem_ctl.ma_chunks, ma_node)
 
 #define FOR_EACH_FREE_BLOCK(block, chunk) \
     LIST_FOREACH(block, &chunk->ma_freeblks, mb_node)
 
-#define FST_FREE_BLK_IN_CHUNK(chunk) LIST_FIRST(&chunk->ma_freeblks)
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 
-#define SND_FREE_BLK_IN_CHUNK(chunk) \
-    LIST_NEXT(FST_FREE_BLK_IN_CHUNK(chunk), mb_node)
-
-#define FULL_CHUNK_SIZE(chunk) (chunk->size + sizeof(mem_chunk_t))
-#define FULL_BLOCK_SIZE(block) (block->mb_size + sizeof(mem_block_t))
+#define container_of(ptr, type, member) ({                      \
+        const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
+        (type *)( (char *)__mptr - offsetof(type,member) );})
 
 typedef struct mem_block {
     int32_t mb_size;                    // mb_size < 0 => allocated
@@ -56,7 +66,11 @@ mem_chunk_t *allocate_chunk(size_t size);
 mem_chunk_t *find_chunk(void *ptr);
 
 mem_chunk_block_tuple_t *find_free_block_with_size(size_t size);
+mem_block_t *left_coalesce_blocks(mem_block_t *left_block, mem_block_t *block);
+mem_block_t *right_coalesce_blocks(mem_block_t *block, mem_block_t *right_block);
 mem_block_t *create_allocated_block(mem_block_t *free_block, size_t size);
+mem_block_t *get_first_block(mem_block_t *starting_block);
+mem_block_t *find_fst_prev_free_block(mem_block_t *starting_block);
 mem_block_t *find_block(void *ptr);
 mem_block_t *allocate_mem_in_block(
         mem_chunk_t *chunk,
