@@ -23,14 +23,22 @@
 #define CANARY_VALID_OR_NULL(block) assert(block == NULL || IS_CANARY_VALID(block))
 
 /* BLOCK OPERATIONS */
+#define ABS(x) ((x < 0) ? (-x) : x)
+
 #define FULL_CHUNK_SIZE(chunk) (chunk->size + sizeof(mem_chunk_t))
-#define FULL_BLOCK_SIZE(block) (block->mb_size + sizeof(mem_block_t))
+#define FULL_BLOCK_SIZE(block) (ABS(block->mb_size) + sizeof(mem_block_t))
+#define CHUNK_END_ADDR(chunk) ((void*) chunk + FULL_CHUNK_SIZE(chunk))
+#define BLOCK_END_ADDR(block) ((void*) block + FULL_BLOCK_SIZE(block))
 #define IS_BLOCK_FREE(block) (block->mb_size > 0)
 
-#define GET_NEXT_BLOCK(block) ({\
-    mem_block_t *next_block = block + FULL_BLOCK_SIZE(block); \
-    CANARY_VALID_OR_NULL(next_block); \
-    block; })
+#define IS_LAST_BLOCK(chunk, block) \
+    (BLOCK_END_ADDR(block) == CHUNK_END_ADDR(chunk))
+
+#define GET_NEXT_BLOCK(chunk, block) ({\
+    assert(!IS_LAST_BLOCK(chunk, block)); \
+    mem_block_t *next_block = BLOCK_END_ADDR(block); \
+    CANARY_CHECK(next_block); \
+    next_block; })
 
 #define GET_PREV_BLOCK(block) ({ \
     mem_block_t *prev_block  = block->prev_block; \
@@ -41,9 +49,6 @@
 
 #define SND_FREE_BLK_IN_CHUNK(chunk) \
     LIST_NEXT(FST_FREE_BLK_IN_CHUNK(chunk), mb_node)
-
-#define IS_LAST_BLOCK(chunk, block) ( \
-    (void*) (block + FULL_BLOCK_SIZE(block)) >= (void*)(chunk + FULL_CHUNK_SIZE(chunk)))
 
 /* LIST LOOPING HELPERS */
 #define FOR_EACH_CHUNK(chunk) \
@@ -88,7 +93,8 @@ mem_chunk_t *allocate_chunk(size_t size);
 mem_chunk_t *find_chunk(void *ptr);
 void free_chunk(mem_chunk_t *chunk);
 
-void left_coalesce_blocks(mem_block_t *left_block, mem_block_t *block);
+void left_coalesce_blocks(mem_chunk_t *chunk, mem_block_t *left_block,
+                          mem_block_t *block);
 void right_coalesce_blocks(mem_block_t *block, mem_block_t *right_block);
 void free_block(void *ptr);
 
@@ -103,6 +109,6 @@ mem_block_t *allocate_mem_in_block(
         size_t size
 );
 
-void dump_chunk_list();
+void dump_chunks_all_blocks();
 
 #endif

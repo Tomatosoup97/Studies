@@ -80,7 +80,7 @@ void free(void *ptr) {
 
 void mdump() {
     // dump current memory manager state
-    dump_chunk_list();
+    dump_chunks_all_blocks();
 }
 
 
