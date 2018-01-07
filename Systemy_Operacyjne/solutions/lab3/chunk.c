@@ -39,7 +39,7 @@ mem_chunk_t *allocate_chunk(size_t size) {
 
     new_chunk->size = required_space - sizeof(mem_chunk_t);
 
-    mem_block_t *initial_block = (new_chunk + sizeof(mem_chunk_t));
+    mem_block_t *initial_block = (mem_block_t*) (new_chunk + sizeof(mem_chunk_t));
     initial_block->mb_size = new_chunk->size - sizeof(mem_block_t);
     initial_block->prev_block = NULL;
 
@@ -59,7 +59,7 @@ bool is_ptr_in_range(void *ptr, uint64_t from_addr, uint64_t interval) {
 }
 
 bool is_pointer_in_chunk(mem_chunk_t *chunk, void *ptr) {
-    return is_ptr_in_range(ptr, chunk, FULL_CHUNK_SIZE(chunk));
+    return is_ptr_in_range(ptr, (uint64_t) chunk, FULL_CHUNK_SIZE(chunk));
 }
 
 bool is_pointer_in_block(mem_block_t *block, void *ptr) {
@@ -78,13 +78,13 @@ mem_chunk_t *find_chunk(void *ptr) {
 
 mem_chunk_block_tuple_t *find_free_block_with_size(size_t size) {
     /* Find first block that has free :size: space */
-    mem_chunk_block_tuple_t *chunk_blk_tuple;
+    mem_chunk_block_tuple_t *chunk_blk_tuple = NULL;
     mem_chunk_t *chunk;
     mem_block_t *block;
 
     FOR_EACH_CHUNK(chunk)
         FOR_EACH_FREE_BLOCK(block, chunk)
-            if (block->mb_size >= size) {
+            if (block->mb_size >= (int32_t) size) {
                 chunk_blk_tuple->block = block;
                 chunk_blk_tuple->chunk = chunk;
                 return chunk_blk_tuple;
@@ -94,7 +94,7 @@ mem_chunk_block_tuple_t *find_free_block_with_size(size_t size) {
 
 void free_chunk(mem_chunk_t *chunk) {
     assert(SND_FREE_BLK_IN_CHUNK(chunk) == NULL);
-    // TODO: free_block(chunk->ma_first) ?
+    // TODO: free_block(chink->ma_first) ?
     // TODO: free chunk mem space
     // munmap(chunk, FULL_CHUNK_SIZE(chunk));
     LIST_REMOVE(chunk, ma_node);
@@ -112,7 +112,7 @@ mem_block_t *create_allocated_block(mem_block_t *free_block, size_t size) {
     block->prev_block = free_block;
 
     // TODO: alignment!
-    block->mb_data[0] = (void*) block + sizeof(mem_block_t);
+    block->mb_data[0] = (uint64_t) (block + sizeof(mem_block_t));
     block->mb_size = (-1) * size; // when block is allocated size is negative
 
     return block;
@@ -123,7 +123,7 @@ mem_block_t *allocate_mem_in_block(
         mem_block_t *free_block,
         size_t size
 ) {
-    assert(free_block->mb_size >= size);
+    assert(free_block->mb_size >= (int32_t) size);
     pthread_mutex_lock(&mem_ctl.mutex);
 
     size_t free_block_space_size = free_block->mb_size;
@@ -155,15 +155,15 @@ mem_block_t *find_fst_prev_free_block(mem_block_t *starting_block) {
 }
 
 mem_block_t *find_block(void *ptr) {
-    return &(container_of(ptr, mem_block_t, mb_data));
+    return container_of(ptr, mem_block_t, mb_data);
 }
 
-mem_block_t *left_coalesce_blocks(mem_block_t *left_block, mem_block_t *block) {
+void left_coalesce_blocks(mem_block_t *left_block, mem_block_t *block) {
     assert(IS_BLOCK_FREE(left_block) && IS_BLOCK_FREE(block));
     left_block->mb_size += FULL_BLOCK_SIZE(block);
 }
 
-mem_block_t *right_coalesce_blocks(mem_block_t *block, mem_block_t *right_block) {
+void right_coalesce_blocks(mem_block_t *block, mem_block_t *right_block) {
     assert(IS_BLOCK_FREE(block) && IS_BLOCK_FREE(right_block));
     mem_block_t *next_block = LIST_NEXT(right_block, mb_node);
 
@@ -176,6 +176,7 @@ mem_block_t *right_coalesce_blocks(mem_block_t *block, mem_block_t *right_block)
 void free_block(void *ptr) {
     mem_chunk_t *chunk = find_chunk(ptr);
     mem_block_t *block = find_block(ptr);
+
     block->mb_size *= (-1); // mark size as free
 
     mem_block_t *prev_block = block->prev_block;

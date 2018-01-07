@@ -24,7 +24,7 @@
     LIST_NEXT(FST_FREE_BLK_IN_CHUNK(chunk), mb_node)
 
 #define IS_LAST_BLOCK(chunk, block) ( \
-    (block + FULL_BLOCK_SIZE(block)) >= (chunk + FULL_CHUNK_SIZE(chunk)))
+    (void*) (block + FULL_BLOCK_SIZE(block)) >= (void*)(chunk + FULL_CHUNK_SIZE(chunk)))
 
 #define FOR_EACH_CHUNK(chunk) \
     LIST_FOREACH(chunk, &mem_ctl.ma_chunks, ma_node)
@@ -64,10 +64,13 @@ size_t calc_required_space(size_t size);
 
 mem_chunk_t *allocate_chunk(size_t size);
 mem_chunk_t *find_chunk(void *ptr);
+void free_chunk(mem_chunk_t *chunk);
+
+void left_coalesce_blocks(mem_block_t *left_block, mem_block_t *block);
+void right_coalesce_blocks(mem_block_t *block, mem_block_t *right_block);
+void free_block(void *ptr);
 
 mem_chunk_block_tuple_t *find_free_block_with_size(size_t size);
-mem_block_t *left_coalesce_blocks(mem_block_t *left_block, mem_block_t *block);
-mem_block_t *right_coalesce_blocks(mem_block_t *block, mem_block_t *right_block);
 mem_block_t *create_allocated_block(mem_block_t *free_block, size_t size);
 mem_block_t *get_first_block(mem_block_t *starting_block);
 mem_block_t *find_fst_prev_free_block(mem_block_t *starting_block);
@@ -78,7 +81,6 @@ mem_block_t *allocate_mem_in_block(
         size_t size
 );
 
-void free_chunk(mem_chunk_t *chunk);
 void dump_chunk_list();
 
 #endif

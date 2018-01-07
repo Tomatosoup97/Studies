@@ -24,3 +24,5 @@ chunk.o:
 clean:
 	rm -vf $(BINS)
 	rm -vf *.o
+	rm -vf *.gch
+
