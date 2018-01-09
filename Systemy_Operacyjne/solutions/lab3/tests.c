@@ -314,19 +314,39 @@ MU_TEST(test_free) {
 
 MU_TEST(test_malloc) {
     int array_size = 21;
-    char *array = foo_malloc(array_size * sizeof(char));
+    char *array = (char*) foo_malloc(array_size * sizeof(char));
+
     array = "THIS IS AN EX-PARROT!";
+
+    mem_block_t *block = find_block(array);
+    printf("\n%p\n", block);
+    printf("\n%p\n", block->mb_data);
+    printf("\n%p\n", array);
 
     mdump();
     printf("%s\n", array);
     printf("\nchar: %c", array[20]);
-    array[2] = 'D';
+//    array[2] = 'D';
     // reverse string
-    for (int i=array_size-1; i >= 0; i++)
-        array[i] = array[array_size - i - 1];
+//    for (int i=array_size-1; i >= 0; i++)
+//        array[i] = array[array_size - i - 1];
 
-    mu_check(array == "!TORRAP-XE NA SI SIHT");
+//    mu_check(array == "!TORRAP-XE NA SI SIHT");
     mu_check(LIST_FIRST(&mem_ctl.ma_chunks) != NULL);
+
+    foo_free(array);
+
+    mu_check(LIST_FIRST(&mem_ctl.ma_chunks) == NULL);
+}
+
+MU_TEST(test_malloc_big_space) {
+    // TODO: why it fails?
+//    char *array = (char*) foo_malloc(4096 * 6 - BOTH_METADATA_SIZE);
+    char *array = (char*) foo_malloc(4096 * 6);
+//    mdump();
+//    printf("%d\n", PAGESIZE * 7);
+//    printf("%d\n", PAGESIZE * 6);
+    mu_check(LIST_FIRST(&mem_ctl.ma_chunks)->size == PAGESIZE * 7 - sizeof(mem_block_t));
 
     foo_free(array);
 
@@ -336,9 +356,8 @@ MU_TEST(test_malloc) {
 MU_TEST(test_calloc_fills_memory_with_zero) {
     char *array = foo_calloc(10, sizeof(char));
 
-    for (int i=0; i<10; i++) {
+    for (int i=0; i<10; i++)
         mu_check(array[i] == 0);
-    }
 
     foo_free(array);
 }
@@ -414,9 +433,10 @@ MU_TEST_SUITE(test_suite) {
     MU_RUN_TEST(test_posix_memalign_return_error_on_invalid_alignment);
     MU_RUN_TEST(test_is_power_of_two);
     MU_RUN_TEST(test_free);
-    MU_RUN_TEST(test_malloc);
-    MU_RUN_TEST(test_calloc_fills_memory_with_zero);
-    MU_RUN_TEST(test_calloc);
+//    MU_RUN_TEST(test_malloc);
+    MU_RUN_TEST(test_malloc_big_space);
+//    MU_RUN_TEST(test_calloc);
+//    MU_RUN_TEST(test_calloc_fills_memory_with_zero);
 }
 
 int main() {

@@ -33,11 +33,10 @@ void zero_init_memory(void *ptr, int32_t size) {
 }
 
 void *foo_calloc(size_t count, size_t size) {
-    // TODO: test
     void *ptr;
 
     pthread_mutex_lock(&mem_ctl.mutex);
-    int res = posix_memalign(&ptr, WORDSIZE, count * size);
+    int res = foo_posix_memalign(&ptr, WORDSIZE, count * size);
     if (res == ENOMEM) errno = ENOMEM;
 
     zero_init_memory(ptr, size);
@@ -48,11 +47,11 @@ void *foo_calloc(size_t count, size_t size) {
 
 void *foo_realloc(void *ptr, size_t size) {
     if (size == 0) {
-        free(ptr);
+        foo_free(ptr);
         return NULL;
     }
     if (ptr == NULL)
-        return malloc(size);
+        return foo_malloc(size);
 
     pthread_mutex_lock(&mem_ctl.mutex);
 
