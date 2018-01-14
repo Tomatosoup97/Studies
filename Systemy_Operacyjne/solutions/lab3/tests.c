@@ -1,3 +1,4 @@
+#include <sys/mman.h>
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>
@@ -11,42 +12,46 @@
 extern mem_ctl_t mem_ctl;
 
 void test_setup(void) {
-    LIST_INIT(&mem_ctl.ma_chunks); // reset list
+    // Do nothing
 }
 
 void test_teardown(void) {
+    /* Deallocate memory */
     mem_chunk_t *chunk;
-    FOR_EACH_CHUNK(chunk) {
-        mem_block_t *block = chunk->ma_first;
+    mem_block_t *block;
+    mem_chunk_t *tmp_chunk;
+
+    LIST_INIT(&mem_ctl.ma_chunks);
+
+    FOR_EACH_CHUNK_SAFE(chunk, tmp_chunk) {
+        // Make sure all canaries are valid
+        block = chunk->ma_first;
         while (true) {
             CANARY_CHECK(block);
-
-            if (!IS_BLOCK_FREE(block)) {
-                foo_free(block->mb_data);
-                block = chunk->ma_first;
-                continue;
-            }
-
             if (IS_LAST_BLOCK(chunk, block)) break;
             block = GET_NEXT_BLOCK(chunk, block);
         }
+
+        munmap(chunk, FULL_CHUNK_SIZE(chunk));
     }
 }
+
 
 /* TEST CHUNK OPERATIONS */
 
 MU_TEST(test_align_size) {
-    mu_check(align_size(15, 16) == 16);
-    mu_check(align_size(32, 8) == 32);
-    mu_check(align_size(42, 8) == 48);
+    mu_check(ALIGN_SIZE(15, 16) == 16);
+    mu_check(ALIGN_SIZE(32, 8) == 32);
+    mu_check(ALIGN_SIZE(42, 8) == 48);
 }
 
 MU_TEST(test_calc_space_required) {
-    size_t one_page_size = PAGESIZE - sizeof(mem_chunk_t);
+    size_t one_page_size = PAGESIZE - BOTH_METADATA_SIZE;
     mu_check(calc_required_space(10) == (size_t) PAGESIZE);
     mu_check(calc_required_space(one_page_size) == (size_t)PAGESIZE);
     mu_check(calc_required_space(one_page_size + 1) == (size_t) PAGESIZE * 2);
     mu_check(calc_required_space(PAGESIZE * 5) == (size_t) PAGESIZE * 6);
+    mu_check(calc_required_space(PAGESIZE * 3 - BOTH_METADATA_SIZE) % PAGESIZE == 0);
 }
 
 MU_TEST(test_allocate_chunk) {
@@ -59,7 +64,7 @@ MU_TEST(test_allocate_chunk) {
     mu_check(chunk->ma_first->mb_size == exp_fst_blk_size);
     mu_check(chunk->ma_first->magic_val == CANARY_ADDR);
     mu_check(chunk->ma_first->prev_block == NULL);
-    mu_check(LIST_FIRST(&chunk->ma_freeblks)->mb_size == chunk->ma_first->mb_size);
+    mu_check(FST_FREE_BLK_IN_CHUNK(chunk)->mb_size == chunk->ma_first->mb_size);
     mu_check(SND_FREE_BLK_IN_CHUNK(chunk) == NULL);
 }
 
@@ -111,7 +116,7 @@ MU_TEST(test_find_free_block_with_size) {
 
 MU_TEST(test_find_free_block_with_size__return_null_when_no_block_found) {
     allocate_chunk(PAGESIZE);
-    allocate_chunk(PAGESIZE * 3 - sizeof(mem_chunk_t));
+    allocate_chunk(PAGESIZE * 3 - BOTH_METADATA_SIZE);
     allocate_chunk(256);
     mem_chunk_block_tuple_t result = find_free_block_with_size(PAGESIZE * 3);
 
@@ -120,7 +125,7 @@ MU_TEST(test_find_free_block_with_size__return_null_when_no_block_found) {
 }
 
 MU_TEST(test_create_allocated_block) {
-    mem_chunk_t *chunk = allocate_chunk(PAGESIZE - sizeof(mem_chunk_t));
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE - BOTH_METADATA_SIZE);
     mem_block_t *free_block = chunk->ma_first;
     mem_block_t *alloc_block = create_allocated_block(free_block, 256);
 
@@ -134,7 +139,7 @@ MU_TEST(test_create_allocated_block) {
 
 MU_TEST(test_allocate_mem_in_block) {
     size_t alloc_size = 256;
-    mem_chunk_t *chunk = allocate_chunk(PAGESIZE - sizeof(mem_chunk_t));
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE - BOTH_METADATA_SIZE);
     mem_block_t *free_block = chunk->ma_first;
     mem_block_t *alloc_block = allocate_mem_in_block(chunk, free_block, alloc_size);
 
@@ -207,7 +212,7 @@ MU_TEST(test_find_fst_prev_free_block) {
 }
 
 MU_TEST(test_left_coalesce_blocks) {
-    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*2 - sizeof(mem_chunk_t));
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*2 - BOTH_METADATA_SIZE);
     mem_block_t *free_block = chunk->ma_first;
     mem_block_t *alloc_block = allocate_mem_in_block(chunk, free_block, 256);
 
@@ -220,7 +225,7 @@ MU_TEST(test_left_coalesce_blocks) {
 MU_TEST(test_left_coalesce_blocks__more_blocks) {
     // [ block_left | block_mid | block_right ]
     size_t size = 256;
-    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*5 - sizeof(mem_chunk_t));
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*5 - BOTH_METADATA_SIZE);
     mem_block_t *block_left = chunk->ma_first;
     mem_block_t *block_right = allocate_mem_in_block(chunk, block_left, size);
     mem_block_t *block_mid = allocate_mem_in_block(chunk, block_left, size);
@@ -230,7 +235,7 @@ MU_TEST(test_left_coalesce_blocks__more_blocks) {
 }
 
 MU_TEST(test_right_coalesce_blocks__one_free_block) {
-    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*2 - sizeof(mem_chunk_t));
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*2 - BOTH_METADATA_SIZE);
     mem_block_t *left_block = chunk->ma_first;
     mem_block_t *right_block = allocate_mem_in_block(chunk, left_block, 256);
     right_block->mb_size = ABS(right_block->mb_size);
@@ -264,9 +269,27 @@ MU_TEST(test_right_coalesce_blocks) {
     mu_check(block_mid->mb_size == (int32_t) (size + FULL_BLOCK_SIZE(block_right)));
 }
 
+MU_TEST(test_shift_free_block_right) {
+    // [(free) block_left | block_mid | (free) block_right ]
+    size_t size = 256;
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*4 - sizeof(mem_chunk_t));
+    mem_block_t *block_left = chunk->ma_first;
+    mem_block_t *block_right = allocate_mem_in_block(chunk, block_left, size);
+    mem_block_t *block_mid = allocate_mem_in_block(chunk, block_left, size);
+
+    foo_free(block_right->mb_data);
+    mu_check(LIST_NEXT(block_left, mb_node) == block_right);
+
+    mem_block_t *shifted_block = shift_free_block_right(block_right, 16);
+
+    mu_check(shifted_block->mb_size == (int64_t) (size - 16));
+    mu_check(shifted_block->prev_block == block_mid);
+    mu_check(LIST_NEXT(block_left, mb_node) == shifted_block);
+}
+
 MU_TEST(test_free_block) {
     // [ block_left | block_mid | block_right | block_last ]
-    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*5 - sizeof(mem_chunk_t));
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*5 - BOTH_METADATA_SIZE);
     mem_block_t *block_left = chunk->ma_first;
     mem_block_t *block_last = allocate_mem_in_block(chunk, block_left, 256);
     mem_block_t *block_right = allocate_mem_in_block(chunk, block_left, 256);
@@ -348,18 +371,17 @@ MU_TEST(test_malloc) {
 }
 
 MU_TEST(test_malloc_big_space) {
-    char *array1 = (char*) foo_malloc(4096 * 6);
-//     TODO: why it fails?
-//    char *array2 = (char*) foo_malloc(4096 * 6 - BOTH_METADATA_SIZE);
-//    mdump();
-//    printf("%d\n", PAGESIZE * 7);
-//    printf("%d\n", PAGESIZE * 6);
+    char *array1 = (char*) foo_malloc(4096 * 8);
+    char *array2 = (char*) foo_malloc(4096*2);
 
-    mu_check(LIST_FIRST(&mem_ctl.ma_chunks)->size == PAGESIZE * 7 - sizeof(mem_block_t));
+    mu_check(LIST_FIRST(&mem_ctl.ma_chunks)->size == \
+             (int64_t) (PAGESIZE * 3 - sizeof(mem_chunk_t)));
+
+    mu_check(LIST_NEXT(LIST_FIRST(&mem_ctl.ma_chunks), ma_node)->size == \
+             (int64_t) (PAGESIZE * 9 - sizeof(mem_chunk_t)));
 
     foo_free(array1);
-
-//    foo_free(array2);
+    foo_free(array2);
 
     mu_check(LIST_FIRST(&mem_ctl.ma_chunks) == NULL);
 }
@@ -394,20 +416,15 @@ MU_TEST(test_calloc) {
 
     int32_t points_count = 4;
     point_t *points = foo_calloc(points_count, sizeof(point_t));
-//    point_t *points = calloc(points_count, sizeof(point_t));
     int *results = (int*) foo_calloc(points_count, sizeof(int));
-//    int *results = (int*) calloc(points_count, sizeof(int));
-    printf("\n\nDUPA\n\n");
     int xs[4] = {2, 4, 8, 42};
     int ys[4] = {4, 1, 3, 1};
-    mdump();
 
     for (int i=0; i < points_count; i++) {
         points->x = xs[i];
         points->y = ys[i];
         results[i] = points->x * points->y;
     }
-    mdump();
 
     int expected_results[4] = {8, 4, 24, 42};
     for (int i=0; i < points_count; i++)
@@ -418,12 +435,11 @@ MU_TEST(test_calloc) {
     mem_block_t *points_block = find_block(points);
 
     mu_check(chunk == find_chunk(points));
-    mu_check(results_block->mb_size == 64);
-    mu_check(points_block->mb_size == 64);
+    mu_check(ABS(results_block->mb_size) == 64);
+    mu_check(ABS(points_block->mb_size) == 64);
     mu_check(GET_NEXT_BLOCK(chunk, chunk->ma_first) == results_block);
     mu_check(GET_NEXT_BLOCK(chunk, results_block) == points_block);
 
-    mdump();
     foo_free(results);
 
     mu_check(LIST_FIRST(&mem_ctl.ma_chunks) != NULL);
@@ -433,42 +449,100 @@ MU_TEST(test_calloc) {
     mu_check(LIST_FIRST(&mem_ctl.ma_chunks) == NULL);
 }
 
+MU_TEST(test_realloc__shrink_size) {
+    void* current_mem = foo_malloc(1024);
+    mem_block_t *prev_block = find_block(current_mem);
+
+    size_t new_size = 512;
+    void* realloc_mem = foo_realloc(current_mem, new_size);
+    mem_block_t *realloc_block = find_block(realloc_mem);
+
+    mu_check(realloc_block->magic_val == CANARY_ADDR);
+    mu_check(prev_block == realloc_block);
+    mu_check(realloc_block->mb_size == (-1) * (int64_t) new_size);
+}
+
+MU_TEST(test_realloc__alloc_in_new_place) {
+    void* current_mem = foo_malloc(1024);
+    mem_block_t *prev_block = find_block(current_mem);
+
+    size_t new_size = PAGESIZE;
+    void* realloc_mem = foo_realloc(current_mem, new_size);
+    mem_chunk_t *realloc_chunk = find_chunk(realloc_mem);
+    mem_block_t *realloc_block = find_block(realloc_mem);
+
+    mu_check(prev_block != realloc_block);
+    mu_check(realloc_block->mb_size == (-1) * PAGESIZE);
+
+    mu_check(LIST_FIRST(&mem_ctl.ma_chunks) == realloc_chunk);
+    mu_check(LIST_NEXT(LIST_FIRST(&mem_ctl.ma_chunks), ma_node) == NULL);
+}
+
+MU_TEST(test_realloc__take_mem_from_next_free_block) {
+    size_t size = 256;
+    mem_chunk_t *chunk = allocate_chunk(PAGESIZE*4 - sizeof(mem_chunk_t));
+    mem_block_t *block_left = chunk->ma_first;
+    mem_block_t *block_right = allocate_mem_in_block(chunk, block_left, size);
+    mem_block_t *block_mid = allocate_mem_in_block(chunk, block_left, size);
+
+    foo_free(block_right->mb_data);
+
+    void* realloc_ptr = foo_realloc(block_mid->mb_data, size + WORDSIZE);
+    mem_block_t *shifted_block_right = LIST_NEXT(block_left, mb_node);
+
+    mu_check(realloc_ptr == (void*) block_mid->mb_data);
+    mu_check(block_mid->mb_size == (-1) * ((int64_t) (size + WORDSIZE)));
+    mu_check(shifted_block_right->mb_size == (int64_t) (size - WORDSIZE));
+    mu_check(shifted_block_right->prev_block == block_mid);
+    mu_check(GET_NEXT_BLOCK(chunk, block_mid) == shifted_block_right);
+}
+
 /* CONFIG */
 
 MU_TEST_SUITE(test_suite) {
     /* TEST CHUNK */
     MU_RUN_TEST(test_calc_space_required);
-    MU_RUN_TEST(test_allocate_chunk);
     MU_RUN_TEST(test_align_size);
+
+    MU_RUN_TEST(test_allocate_chunk);
     MU_RUN_TEST(test_find_chunk);
     MU_RUN_TEST(test_free_chunk);
 
     /* TEST BLOCK */
+    MU_RUN_TEST(test_create_allocated_block);
+    MU_RUN_TEST(test_allocate_mem_in_block);
+    MU_RUN_TEST(test_get_first_block);
+
     MU_RUN_TEST(test_find_free_block_with_size);
     MU_RUN_TEST(test_find_free_block_with_size__return_null_when_no_block_found);
     MU_RUN_TEST(test_find_fst_prev_free_block);
     MU_RUN_TEST(test_find_block);
-
-    MU_RUN_TEST(test_create_allocated_block);
-    MU_RUN_TEST(test_allocate_mem_in_block);
-    MU_RUN_TEST(test_get_first_block);
 
     MU_RUN_TEST(test_left_coalesce_blocks);
     MU_RUN_TEST(test_left_coalesce_blocks__more_blocks);
     MU_RUN_TEST(test_right_coalesce_blocks__one_free_block);
     MU_RUN_TEST(test_right_coalesce_blocks);
 
+    MU_RUN_TEST(test_shift_free_block_right);
+
     MU_RUN_TEST(test_free_block);
 
     /* TEST MEM_MGMT */
-    MU_RUN_TEST(test_posix_memalign_return_error_on_invalid_alignment);
     MU_RUN_TEST(test_is_power_of_two);
-    MU_RUN_TEST(test_free);
+    MU_RUN_TEST(test_posix_memalign_return_error_on_invalid_alignment);
+
     MU_RUN_TEST(test_malloc);
     MU_RUN_TEST(test_malloc_big_space);
     MU_RUN_TEST(test_malloc__many_allocations);
-//    MU_RUN_TEST(test_calloc);
+
+    MU_RUN_TEST(test_calloc);
     MU_RUN_TEST(test_calloc_fills_memory_with_zero);
+
+    MU_RUN_TEST(test_free);
+
+    MU_RUN_TEST(test_realloc__shrink_size);
+    MU_RUN_TEST(test_realloc__alloc_in_new_place);
+    MU_RUN_TEST(test_realloc__take_mem_from_next_free_block);
 }
 
 int main() {

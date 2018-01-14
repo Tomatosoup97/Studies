@@ -22,6 +22,13 @@
 #define SET_CANARY(block) (block->magic_val = CANARY_ADDR)
 #define CANARY_VALID_OR_NULL(block) assert(block == NULL || IS_CANARY_VALID(block))
 
+/* CALCULATIONS */
+#define ALIGN_SIZE(size, alignment)\
+    (size % alignment) ? size - (size % alignment) + alignment : size
+
+#define CALC_BLOCK_ADDRESS(free_block, size) \
+    (void*) free_block + free_block->mb_size - size
+
 /* BLOCK OPERATIONS */
 #define ABS(x) ((x < 0) ? (-x) : x)
 
@@ -30,6 +37,7 @@
 #define CHUNK_END_ADDR(chunk) ((void*) chunk + FULL_CHUNK_SIZE(chunk))
 #define BLOCK_END_ADDR(block) ((void*) block + FULL_BLOCK_SIZE(block))
 #define IS_BLOCK_FREE(block) (block->mb_size > 0)
+#define MARK_SIZE_ALLOCATED(size) ((-1) * ABS((int64_t) size))
 
 #define IS_LAST_BLOCK(chunk, block) ({\
     assert(BLOCK_END_ADDR(block) <= CHUNK_END_ADDR(chunk)); \
@@ -54,6 +62,9 @@
 /* LIST LOOPING HELPERS */
 #define FOR_EACH_CHUNK(chunk) \
     LIST_FOREACH(chunk, &mem_ctl.ma_chunks, ma_node)
+
+#define FOR_EACH_CHUNK_SAFE(chunk, tmp_chunk) \
+    LIST_FOREACH_SAFE(chunk, &mem_ctl.ma_chunks, ma_node, tmp_chunk)
 
 #define FOR_EACH_FREE_BLOCK(block, chunk) \
     LIST_FOREACH(block, &chunk->ma_freeblks, mb_node)
@@ -100,6 +111,7 @@ void left_coalesce_blocks(mem_chunk_t *chunk, mem_block_t *left_block,
 void right_coalesce_blocks(mem_block_t *block, mem_block_t *right_block);
 void free_block(mem_chunk_t *chunk, void *ptr);
 
+
 mem_chunk_block_tuple_t find_free_block_with_size(size_t size);
 mem_block_t *create_allocated_block(mem_block_t *free_block, size_t size);
 mem_block_t *get_first_block(mem_block_t *starting_block);
@@ -110,6 +122,8 @@ mem_block_t *allocate_mem_in_block(
         mem_block_t *free_block,
         size_t size
 );
+
+mem_block_t *shift_free_block_right(mem_block_t *block, size_t shift);
 
 void dump_chunks_all_blocks();
 

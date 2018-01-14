@@ -1,6 +1,7 @@
 #include <sys/mman.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 #include <assert.h>
 #include "chunk.h"
 #include "queue.h"
@@ -8,15 +9,11 @@
 
 extern mem_ctl_t mem_ctl;
 
-size_t align_size(size_t size, size_t alignment) {
-    return (size % alignment) ? size - (size % alignment) + alignment : size;
-}
-
-size_t calc_required_space(size_t size) {
+inline size_t calc_required_space(size_t size) {
     /* Required space for mem chunk aligned to page size
      * */
-    int required_space = size + sizeof(mem_chunk_t);
-    return align_size(required_space, PAGESIZE);
+    int required_space = size + BOTH_METADATA_SIZE;
+    return ALIGN_SIZE(required_space, PAGESIZE);
 }
 
 mem_block_t *create_initial_free_block(mem_chunk_t *chunk) {
@@ -42,10 +39,7 @@ mem_chunk_t *allocate_chunk(size_t size) {
                      MAP_PRIVATE | MAP_ANONYMOUS,
                      -1, 0);
 
-    if (new_chunk == MAP_FAILED) {
-        // TODO: smarter error handling
-        printf("Chunk mmap failed\n");
-    }
+    assert(new_chunk != MAP_FAILED);
 
     new_chunk->size = required_space - sizeof(mem_chunk_t);
     mem_block_t *initial_block = create_initial_free_block(new_chunk);
@@ -65,10 +59,6 @@ bool is_ptr_in_range(void *ptr, uint64_t from_addr, uint64_t interval) {
 
 bool is_pointer_in_chunk(mem_chunk_t *chunk, void *ptr) {
     return is_ptr_in_range(ptr, (uint64_t) chunk, FULL_CHUNK_SIZE(chunk));
-}
-
-bool is_pointer_in_block(mem_block_t *block, void *ptr) {
-    return is_ptr_in_range(ptr, (uint64_t) block, FULL_BLOCK_SIZE(block));
 }
 
 mem_chunk_t *find_chunk(void *ptr) {
@@ -102,27 +92,19 @@ mem_chunk_block_tuple_t find_free_block_with_size(size_t size) {
 }
 
 void free_chunk(mem_chunk_t *chunk) {
+    assert(IS_LAST_BLOCK(chunk, chunk->ma_first));
     assert(SND_FREE_BLK_IN_CHUNK(chunk) == NULL);
-    // TODO: free_block(chink->ma_first) ?
-    // TODO: free chunk mem space
-//    munmap(chunk, FULL_CHUNK_SIZE(chunk));
     LIST_REMOVE(chunk, ma_node);
-}
-
-void *calc_block_address(mem_block_t *free_block, size_t size) {
-    // TODO: consider making it macro definition
-    return (void*) free_block + free_block->mb_size - size;
+    munmap(chunk, FULL_CHUNK_SIZE(chunk));
 }
 
 mem_block_t *create_allocated_block(mem_block_t *free_block, size_t size) {
     CANARY_CHECK(free_block);
 
-    mem_block_t *block = calc_block_address(free_block, size);
+    mem_block_t *block = CALC_BLOCK_ADDRESS(free_block, size);
     block->prev_block = free_block;
     SET_CANARY(block);
-
-    block->mb_data[0] = (uint64_t) (block + sizeof(mem_block_t));
-    block->mb_size = (-1) * size; // when block is allocated size is negative
+    block->mb_size = MARK_SIZE_ALLOCATED(size);
 
     return block;
 }
@@ -133,7 +115,7 @@ mem_block_t *allocate_mem_in_block(
         size_t size
 ) {
     CANARY_CHECK(free_block);
-    assert(free_block->mb_size >= (int32_t) size + sizeof(mem_block_t));
+    assert(free_block->mb_size >= (int32_t) (size + sizeof(mem_block_t)));
     pthread_mutex_lock(&mem_ctl.mutex);
 
     size_t free_block_space_size = free_block->mb_size;
@@ -197,8 +179,8 @@ void right_coalesce_blocks(mem_block_t *left_block, mem_block_t *right_block) {
     assert(!IS_BLOCK_FREE(left_block) && IS_BLOCK_FREE(right_block));
     pthread_mutex_lock(&mem_ctl.mutex);
 
-    mem_block_t *prev_block = find_fst_prev_free_block(right_block);
     mem_block_t *next_block = LIST_NEXT(right_block, mb_node);
+    mem_block_t *prev_block = find_fst_prev_free_block(right_block);
 
     left_block->mb_size = ABS(left_block->mb_size) + FULL_BLOCK_SIZE(right_block);
 
@@ -250,6 +232,22 @@ void free_block(mem_chunk_t *chunk, void *ptr) {
     pthread_mutex_unlock(&mem_ctl.mutex);
 }
 
+mem_block_t* shift_free_block_right(mem_block_t *block, size_t shift ) {
+    /* Shrink free block by shifting metadata *shift* bytes to the right
+     * Return new pointer to the shifted block
+     * */
+    assert(block->mb_size >= (int32_t) shift);
+
+    mem_block_t *shifted_block = (void*) block + shift;
+
+    LIST_REPLACE(block, shifted_block, mb_node);
+    memcpy((void*) shifted_block, (void*) block, sizeof(mem_block_t));
+    shifted_block->mb_size -= shift;
+
+    CANARY_CHECK(shifted_block);
+    return shifted_block;
+}
+
 void dump_chunks_all_blocks() {
     /* Output chunk list and all its blocks. Additionally, check if canaries
      * in blocks are valid. Negative size indicates that the block is allocated
@@ -275,14 +273,6 @@ void dump_chunks_all_blocks() {
             if (IS_LAST_BLOCK(chunk, block)) break;
             else printf(" -> \n");
             block = GET_NEXT_BLOCK(chunk, block);
-        }
-
-        printf("\nFree blocks:\t");
-
-        block = chunk->ma_first;
-        FOR_EACH_FREE_BLOCK(block, chunk) {
-            printf("[size: %d]", block->mb_size);
-            if (LIST_NEXT(block, mb_node) != NULL) printf(" -> ");
         }
         if (LIST_NEXT(chunk, ma_node) != NULL) printf("\n|\n|\n");
     }
