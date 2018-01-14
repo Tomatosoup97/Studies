@@ -18,7 +18,7 @@ chunk.o:
 	$(CC) $(CFLAGS) -fPIC -c chunk.c chunk.h
 
 libmalloc.so: mem_mgmt.o chunk.o
-	$(CC) -shared -o libmalloc.so mem_mgmt.o chunk.o -pthread
+	$(CC) -shared -o libmalloc.so -fPIC libmalloc.c mem_mgmt.o chunk.o -pthread
 
 clean:
 	rm -vf $(BINS)
