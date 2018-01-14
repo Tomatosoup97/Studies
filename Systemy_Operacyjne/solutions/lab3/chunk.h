@@ -31,8 +31,9 @@
 #define BLOCK_END_ADDR(block) ((void*) block + FULL_BLOCK_SIZE(block))
 #define IS_BLOCK_FREE(block) (block->mb_size > 0)
 
-#define IS_LAST_BLOCK(chunk, block) \
-    (BLOCK_END_ADDR(block) == CHUNK_END_ADDR(chunk))
+#define IS_LAST_BLOCK(chunk, block) ({\
+    assert(BLOCK_END_ADDR(block) <= CHUNK_END_ADDR(chunk)); \
+    (BLOCK_END_ADDR(block) == CHUNK_END_ADDR(chunk)); })
 
 #define GET_NEXT_BLOCK(chunk, block) ({\
     assert(!IS_LAST_BLOCK(chunk, block)); \

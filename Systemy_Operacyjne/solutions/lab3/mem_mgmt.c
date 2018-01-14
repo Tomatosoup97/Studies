@@ -103,7 +103,7 @@ int foo_posix_memalign(void **memptr, size_t alignment, size_t size) {
     bool is_big_allocation = size <= (size_t) SEPARATE_CHUNK_THRESHOLD;
 
     if (is_big_allocation)
-        chunk_blk_tuple = find_free_block_with_size(aligned_size);
+        chunk_blk_tuple = find_free_block_with_size(aligned_size + sizeof(mem_block_t));
 
     if (is_big_allocation && chunk_blk_tuple.block != NULL) {
          *memptr = allocate_mem_in_block(chunk_blk_tuple.chunk,

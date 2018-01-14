@@ -105,7 +105,7 @@ void free_chunk(mem_chunk_t *chunk) {
     assert(SND_FREE_BLK_IN_CHUNK(chunk) == NULL);
     // TODO: free_block(chink->ma_first) ?
     // TODO: free chunk mem space
-    // munmap(chunk, FULL_CHUNK_SIZE(chunk));
+//    munmap(chunk, FULL_CHUNK_SIZE(chunk));
     LIST_REMOVE(chunk, ma_node);
 }
 
@@ -121,7 +121,6 @@ mem_block_t *create_allocated_block(mem_block_t *free_block, size_t size) {
     block->prev_block = free_block;
     SET_CANARY(block);
 
-    // TODO: alignment!
     block->mb_data[0] = (uint64_t) (block + sizeof(mem_block_t));
     block->mb_size = (-1) * size; // when block is allocated size is negative
 
@@ -134,7 +133,7 @@ mem_block_t *allocate_mem_in_block(
         size_t size
 ) {
     CANARY_CHECK(free_block);
-    assert(free_block->mb_size >= (int32_t) size);
+    assert(free_block->mb_size >= (int32_t) size + sizeof(mem_block_t));
     pthread_mutex_lock(&mem_ctl.mutex);
 
     size_t free_block_space_size = free_block->mb_size;
@@ -266,15 +265,15 @@ void dump_chunks_all_blocks() {
     FOR_EACH_CHUNK(chunk) {
         printf("chunk: \t\t[size: %d addr: %p]\n", chunk->size, (void*) chunk);
 
-        printf("All blocks:\t");
+        printf("All blocks:\n");
 
         block = chunk->ma_first;
         while (true) {
             CANARY_CHECK(block);
-            printf("[size: %d, addr: %p]", block->mb_size, (void*) block);
+            printf("\t[size: %d, addr: %p]", block->mb_size, (void*) block);
 
             if (IS_LAST_BLOCK(chunk, block)) break;
-            else printf(" -> ");
+            else printf(" -> \n");
             block = GET_NEXT_BLOCK(chunk, block);
         }
 
@@ -285,7 +284,7 @@ void dump_chunks_all_blocks() {
             printf("[size: %d]", block->mb_size);
             if (LIST_NEXT(block, mb_node) != NULL) printf(" -> ");
         }
-        if (LIST_NEXT(chunk, ma_node) != NULL) printf("\n|\n");
+        if (LIST_NEXT(chunk, ma_node) != NULL) printf("\n|\n|\n");
     }
     printf("\n");
 

@@ -129,6 +129,7 @@ MU_TEST(test_create_allocated_block) {
     mu_check(alloc_block->magic_val == CANARY_ADDR);
     mu_check((void*) alloc_block == \
              (void*) free_block + PAGESIZE - BOTH_METADATA_SIZE - 256);
+    mu_check(IS_LAST_BLOCK(chunk, alloc_block));
 }
 
 MU_TEST(test_allocate_mem_in_block) {
@@ -367,17 +368,11 @@ MU_TEST(test_malloc__many_allocations) {
     const int count = 100;
     char *array[count];
 
-    for (int i=0; i<count; i++) {
+    for (int i=0; i<count; i++)
         array[i] = foo_malloc(i * sizeof(char));
-        (array[i])[0] = 'B';
-        (array[i])[i] = 'E';
-    }
 
-    for (int i=0; i<count; i++) {
-        mu_check((array[i])[0] == 'B');
-        mu_check((array[i])[i] == 'E');
-        free(array[i]);
-    }
+    for (int i=0; i<count; i++)
+        foo_free(array[i]);
 
     mu_check(LIST_FIRST(&mem_ctl.ma_chunks) == NULL);
 }
@@ -471,7 +466,7 @@ MU_TEST_SUITE(test_suite) {
     MU_RUN_TEST(test_free);
     MU_RUN_TEST(test_malloc);
     MU_RUN_TEST(test_malloc_big_space);
-//    MU_RUN_TEST(test_malloc__many_allocations);
+    MU_RUN_TEST(test_malloc__many_allocations);
 //    MU_RUN_TEST(test_calloc);
     MU_RUN_TEST(test_calloc_fills_memory_with_zero);
 }
