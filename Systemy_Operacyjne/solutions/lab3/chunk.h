@@ -57,6 +57,7 @@
 #define FOR_EACH_FREE_BLOCK(block, chunk) \
     LIST_FOREACH(block, &chunk->ma_freeblks, mb_node)
 
+
 /* GET CONTAINER BY POINTER TO DATA */
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 #define container_of(ptr, type, member) ({                      \
@@ -98,7 +99,7 @@ void left_coalesce_blocks(mem_chunk_t *chunk, mem_block_t *left_block,
 void right_coalesce_blocks(mem_block_t *block, mem_block_t *right_block);
 void free_block(mem_chunk_t *chunk, void *ptr);
 
-mem_chunk_block_tuple_t *find_free_block_with_size(size_t size);
+mem_chunk_block_tuple_t find_free_block_with_size(size_t size);
 mem_block_t *create_allocated_block(mem_block_t *free_block, size_t size);
 mem_block_t *get_first_block(mem_block_t *starting_block);
 mem_block_t *find_fst_prev_free_block(mem_block_t *starting_block);

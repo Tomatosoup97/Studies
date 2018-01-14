@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <assert.h>
+#include <stdbool.h>
 #include "minunit.h"
 #include "mem_mgmt.h"
 #include "chunk.h"
@@ -14,8 +15,22 @@ void test_setup(void) {
 }
 
 void test_teardown(void) {
-    // Do nothing
-    // TODO: deallocate memory?
+    mem_chunk_t *chunk;
+    FOR_EACH_CHUNK(chunk) {
+        mem_block_t *block = chunk->ma_first;
+        while (true) {
+            CANARY_CHECK(block);
+
+            if (!IS_BLOCK_FREE(block)) {
+                foo_free(block->mb_data);
+                block = chunk->ma_first;
+                continue;
+            }
+
+            if (IS_LAST_BLOCK(chunk, block)) break;
+            block = GET_NEXT_BLOCK(chunk, block);
+        }
+    }
 }
 
 /* TEST CHUNK OPERATIONS */
@@ -88,18 +103,20 @@ MU_TEST(test_find_free_block_with_size) {
     mem_chunk_t *expected_chunk = allocate_chunk(PAGESIZE*3);
     allocate_chunk(256);
 
-    mem_chunk_block_tuple_t *result = find_free_block_with_size(PAGESIZE*2);
+    mem_chunk_block_tuple_t result = find_free_block_with_size(PAGESIZE*2);
 
-    mu_check(result->chunk == expected_chunk);
-    mu_check(result->block == expected_chunk->ma_first);
+    mu_check(result.chunk == expected_chunk);
+    mu_check(result.block == expected_chunk->ma_first);
 }
 
 MU_TEST(test_find_free_block_with_size__return_null_when_no_block_found) {
     allocate_chunk(PAGESIZE);
     allocate_chunk(PAGESIZE * 3 - sizeof(mem_chunk_t));
     allocate_chunk(256);
+    mem_chunk_block_tuple_t result = find_free_block_with_size(PAGESIZE * 3);
 
-    mu_check(find_free_block_with_size(PAGESIZE * 3) == NULL);
+    mu_check(result.block == NULL);
+    mu_check(result.chunk == NULL);
 }
 
 MU_TEST(test_create_allocated_block) {
@@ -313,48 +330,60 @@ MU_TEST(test_free) {
 }
 
 MU_TEST(test_malloc) {
-    int array_size = 21;
-    char *array = (char*) foo_malloc(array_size * sizeof(char));
+    int array_size = 5;
+    int array[] = {1, 2, 3, 4, 5};
+    int *rev_array = (int*) foo_malloc(array_size * sizeof(int));
 
-    array = "THIS IS AN EX-PARROT!";
+    for (int i=array_size-1; i >= 0; i--)
+        rev_array[i] = array[array_size - i - 1];
 
-    mem_block_t *block = find_block(array);
-    printf("\n%p\n", block);
-    printf("\n%p\n", block->mb_data);
-    printf("\n%p\n", array);
-
-    mdump();
-    printf("%s\n", array);
-    printf("\nchar: %c", array[20]);
-//    array[2] = 'D';
-    // reverse string
-//    for (int i=array_size-1; i >= 0; i++)
-//        array[i] = array[array_size - i - 1];
-
-//    mu_check(array == "!TORRAP-XE NA SI SIHT");
+    mu_check(rev_array[array_size-1] == 1);
+    mu_check(rev_array[0] == 5);
     mu_check(LIST_FIRST(&mem_ctl.ma_chunks) != NULL);
 
-    foo_free(array);
+    foo_free(rev_array);
 
     mu_check(LIST_FIRST(&mem_ctl.ma_chunks) == NULL);
 }
 
 MU_TEST(test_malloc_big_space) {
-    // TODO: why it fails?
-//    char *array = (char*) foo_malloc(4096 * 6 - BOTH_METADATA_SIZE);
-    char *array = (char*) foo_malloc(4096 * 6);
+    char *array1 = (char*) foo_malloc(4096 * 6);
+//     TODO: why it fails?
+//    char *array2 = (char*) foo_malloc(4096 * 6 - BOTH_METADATA_SIZE);
 //    mdump();
 //    printf("%d\n", PAGESIZE * 7);
 //    printf("%d\n", PAGESIZE * 6);
+
     mu_check(LIST_FIRST(&mem_ctl.ma_chunks)->size == PAGESIZE * 7 - sizeof(mem_block_t));
 
-    foo_free(array);
+    foo_free(array1);
+
+//    foo_free(array2);
+
+    mu_check(LIST_FIRST(&mem_ctl.ma_chunks) == NULL);
+}
+
+MU_TEST(test_malloc__many_allocations) {
+    const int count = 100;
+    char *array[count];
+
+    for (int i=0; i<count; i++) {
+        array[i] = foo_malloc(i * sizeof(char));
+        (array[i])[0] = 'B';
+        (array[i])[i] = 'E';
+    }
+
+    for (int i=0; i<count; i++) {
+        mu_check((array[i])[0] == 'B');
+        mu_check((array[i])[i] == 'E');
+        free(array[i]);
+    }
 
     mu_check(LIST_FIRST(&mem_ctl.ma_chunks) == NULL);
 }
 
 MU_TEST(test_calloc_fills_memory_with_zero) {
-    char *array = foo_calloc(10, sizeof(char));
+    int *array = (int*) foo_calloc(10, sizeof(int));
 
     for (int i=0; i<10; i++)
         mu_check(array[i] == 0);
@@ -370,16 +399,20 @@ MU_TEST(test_calloc) {
 
     int32_t points_count = 4;
     point_t *points = foo_calloc(points_count, sizeof(point_t));
-    int *results = foo_calloc(points_count, sizeof(int));
-
+//    point_t *points = calloc(points_count, sizeof(point_t));
+    int *results = (int*) foo_calloc(points_count, sizeof(int));
+//    int *results = (int*) calloc(points_count, sizeof(int));
+    printf("\n\nDUPA\n\n");
     int xs[4] = {2, 4, 8, 42};
     int ys[4] = {4, 1, 3, 1};
+    mdump();
 
     for (int i=0; i < points_count; i++) {
         points->x = xs[i];
         points->y = ys[i];
         results[i] = points->x * points->y;
     }
+    mdump();
 
     int expected_results[4] = {8, 4, 24, 42};
     for (int i=0; i < points_count; i++)
@@ -395,8 +428,11 @@ MU_TEST(test_calloc) {
     mu_check(GET_NEXT_BLOCK(chunk, chunk->ma_first) == results_block);
     mu_check(GET_NEXT_BLOCK(chunk, results_block) == points_block);
 
+    mdump();
     foo_free(results);
+
     mu_check(LIST_FIRST(&mem_ctl.ma_chunks) != NULL);
+
     foo_free(points);
 
     mu_check(LIST_FIRST(&mem_ctl.ma_chunks) == NULL);
@@ -433,10 +469,11 @@ MU_TEST_SUITE(test_suite) {
     MU_RUN_TEST(test_posix_memalign_return_error_on_invalid_alignment);
     MU_RUN_TEST(test_is_power_of_two);
     MU_RUN_TEST(test_free);
-//    MU_RUN_TEST(test_malloc);
+    MU_RUN_TEST(test_malloc);
     MU_RUN_TEST(test_malloc_big_space);
+//    MU_RUN_TEST(test_malloc__many_allocations);
 //    MU_RUN_TEST(test_calloc);
-//    MU_RUN_TEST(test_calloc_fills_memory_with_zero);
+    MU_RUN_TEST(test_calloc_fills_memory_with_zero);
 }
 
 int main() {

@@ -81,9 +81,9 @@ mem_chunk_t *find_chunk(void *ptr) {
     return NULL;
 }
 
-mem_chunk_block_tuple_t *find_free_block_with_size(size_t size) {
+mem_chunk_block_tuple_t find_free_block_with_size(size_t size) {
     /* Find first block that has free :size: space */
-    mem_chunk_block_tuple_t *chunk_blk_tuple;
+    mem_chunk_block_tuple_t chunk_blk_tuple;
     mem_chunk_t *chunk;
     mem_block_t *block;
 
@@ -91,11 +91,14 @@ mem_chunk_block_tuple_t *find_free_block_with_size(size_t size) {
         FOR_EACH_FREE_BLOCK(block, chunk)
             if (block->mb_size >= (int32_t) size) {
                 CANARY_CHECK(block);
-                chunk_blk_tuple->block = block;
-                chunk_blk_tuple->chunk = chunk;
+                chunk_blk_tuple.block = block;
+                chunk_blk_tuple.chunk = chunk;
                 return chunk_blk_tuple;
             }
-    return NULL;
+
+    chunk_blk_tuple.block = NULL;
+    chunk_blk_tuple.chunk = NULL;
+    return chunk_blk_tuple;
 }
 
 void free_chunk(mem_chunk_t *chunk) {
@@ -220,6 +223,7 @@ void right_coalesce_blocks(mem_block_t *left_block, mem_block_t *right_block) {
 void free_block(mem_chunk_t *chunk, void *ptr) {
     pthread_mutex_lock(&mem_ctl.mutex);
     mem_block_t *block = find_block(ptr);
+
     assert(block != NULL && IS_CANARY_VALID(block));
 
     mem_block_t *prev_block = GET_PREV_BLOCK(block);
@@ -235,6 +239,7 @@ void free_block(mem_chunk_t *chunk, void *ptr) {
     }
 
     if (is_left_coalescing)
+        // check left coalescing
         left_coalesce_blocks(chunk, prev_block, block);
 
     if (!is_left_coalescing && !is_right_coalescing) {
