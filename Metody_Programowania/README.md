@@ -8,3 +8,5 @@ More interesting things:
 - [HDML language parser](./Solutions/Prolog/HDMLParser/main.pl)
     - language for verifying digital circuits (Verilog alike)
 
+- [Interpreter in Haskel](./Solutions/Haskell/Interpreter)
+
