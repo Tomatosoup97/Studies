@@ -1,6 +1,5 @@
-#include <iostream>
 #include <stdio.h>
-#include <vector>
+#include <stdint.h>
 #include <stack>
 
 #define TRUE 1
@@ -14,29 +13,79 @@
 int q, n;
 int *sizes;
 int *nodes_nums;
-int *visited;
+int8_t *visited;
 int *parents;
 int node_num_counter;
 
-std::vector<int> *adjacency_lists;
+int **adjacency_lists;
+
+void quicksort_graph(int l, int p) {
+    /* Quicksort graph list based on parent value */
+    if (p <= l) return;
+    int i = l, j = p;
+    int s = (i + j) / 2;
+    int pivot = adjacency_lists[s][0];
+
+    while (TRUE) {
+        while (pivot > adjacency_lists[i++][0]);
+        while (pivot < adjacency_lists[j--][0]);
+
+        if (i <= j) {
+            std::swap(adjacency_lists[i][0], adjacency_lists[j][0]);
+            std::swap(adjacency_lists[i][1], adjacency_lists[j][1]);
+        } else {
+            break;
+        }
+    }
+
+    if (j > l) quicksort_graph(l, j);
+    if (i < p) quicksort_graph(i, p);
+}
+
+int binsearch_graph(int l, int p, int parent) {
+    /* binary search for first occurence of given parent in graph */
+    int s;
+
+    while (l <= p) {
+        s = (l + p) / 2;
+        if (adjacency_lists[s][0] == parent) {
+            if (s == 1) return s;
+            while (adjacency_lists[--s][0] == parent);
+            return ++s;
+        }
+
+        if (adjacency_lists[s][0] > parent)
+            p = s - 1;
+        else
+            l = s + 1;
+    }
+    return -1;
+}
 
 void input_graph() {
     /* Input graph into memory */
     int parent_num = 0;
-    adjacency_lists = new std::vector<int> [n+1];
+
+    adjacency_lists = new int* [n+1];
+    for (int i=0; i<=n; i++)
+        adjacency_lists[i] = new int [2];
+
+
     sizes = new int [n+1];
     nodes_nums = new int [n+1];
-    visited = new int [n+1];
+    visited = new int8_t [n+1];
     parents = new int [n+1];
 
     for (int i=1; i<n; i++) {
         scanf("%d", &parent_num);
-        adjacency_lists[parent_num].push_back(i+1);
+        adjacency_lists[i][0] = parent_num;
+        adjacency_lists[i][1] = i+1;
     }
-}
 
+    quicksort_graph(1, n-1);
+}
+/*
 void DFS_recursive(int v) {
-    /* Perform recursive depth first search on vertex v */
     sizes[v] = 1;
     nodes_nums[v] = node_num_counter++;
 
@@ -50,7 +99,7 @@ void DFS_recursive(int v) {
         sizes[v] += sizes[*u];
     }
 }
-
+*/
 void DFS_iterative(int v) {
     /* Perform iterative depth first search on vertex v */
     std::stack<int> stack;
@@ -73,11 +122,13 @@ void DFS_iterative(int v) {
             }
         }
 
-        std::vector<int>::iterator u = adjacency_lists[v].begin();
-        for (; u != adjacency_lists[v].end(); ++u) {
-            if (!visited[*u]) {
-                parents[*u] = v;
-                stack.push(*u);
+        int child = binsearch_graph(1, n-1, v);
+        if (child == -1) continue;  // node is leaf
+        while (adjacency_lists[child][0] == v) {
+            int u = adjacency_lists[child++][1];
+            if (!visited[u]) {
+                parents[u] = v;
+                stack.push(u);
             }
         }
     }
@@ -115,7 +166,7 @@ void output_tree_state() {
     output_array(sizes, "sizes");
     output_array(parents, "parents");
     output_array(nodes_nums, "nodes_nums");
-    output_array(visited, "visited");
+    /* output_array(visited, "visited"); */
 }
 
 int main() {
@@ -123,7 +174,8 @@ int main() {
     input_graph();
 
     if (RECURSIVE)
-        DFS_recursive(ROOT);
+        /* DFS_recursive(ROOT); */
+        return 1;
     else
         DFS_iterative(ROOT);
 
