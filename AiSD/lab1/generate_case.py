@@ -3,10 +3,10 @@ N = 10 ** 6
 
 
 def main():
-    with open('przyklad_D', 'r+') as f:
+    with open('przyklad_F', 'r+') as f:
         f.write("{} {}\n".format(N, 2))
 
-        for i in range(N):
+        for i in range(1, N):
             f.write("{}\n".format(i))
 
         f.write("1 {}\n".format(N))
@@ -15,3 +15,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

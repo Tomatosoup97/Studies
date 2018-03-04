@@ -8,136 +8,69 @@
 
 // Program flags
 #define DEBUG 0
-#define RECURSIVE 0
 
 int q, n;
-int *sizes;
-int *nodes_nums;
-int8_t *visited;
-int *parents;
-int node_num_counter;
+int *time_out;
+int *time_in;
+int node_num_counter=0;
 
-int **adjacency_lists;
-
-void quicksort_graph(int l, int p) {
-    /* Quicksort graph list based on parent value */
-    if (p <= l) return;
-    int i = l, j = p;
-    int s = (i + j) / 2;
-    int pivot = adjacency_lists[s][0];
-
-    while (TRUE) {
-        while (pivot > adjacency_lists[i++][0]);
-        while (pivot < adjacency_lists[j--][0]);
-
-        if (i <= j) {
-            std::swap(adjacency_lists[i][0], adjacency_lists[j][0]);
-            std::swap(adjacency_lists[i][1], adjacency_lists[j][1]);
-        } else {
-            break;
-        }
-    }
-
-    if (j > l) quicksort_graph(l, j);
-    if (i < p) quicksort_graph(i, p);
-}
-
-int binsearch_graph(int l, int p, int parent) {
-    /* binary search for first occurence of given parent in graph */
-    int s;
-
-    while (l <= p) {
-        s = (l + p) / 2;
-        if (adjacency_lists[s][0] == parent) {
-            if (s == 1) return s;
-            while (adjacency_lists[--s][0] == parent);
-            return ++s;
-        }
-
-        if (adjacency_lists[s][0] > parent)
-            p = s - 1;
-        else
-            l = s + 1;
-    }
-    return -1;
-}
+int first_child[1000000+1];
+int neighbours[1000000+1];
 
 void input_graph() {
     /* Input graph into memory */
     int parent_num = 0;
 
-    adjacency_lists = new int* [n+1];
-    for (int i=0; i<=n; i++)
-        adjacency_lists[i] = new int [2];
+    time_out = new int [n+1];
+    time_in = new int [n+1];
 
+    time_in[1] = -1;
 
-    sizes = new int [n+1];
-    nodes_nums = new int [n+1];
-    visited = new int8_t [n+1];
-    parents = new int [n+1];
-
-    for (int i=1; i<n; i++) {
+    for (int i=2; i<=n; i++) {
         scanf("%d", &parent_num);
-        adjacency_lists[i][0] = parent_num;
-        adjacency_lists[i][1] = i+1;
+
+        time_in[i] = -1;
+        time_out[parent_num]++;  // temp. store children count in time_out
+
+        neighbours[i] = first_child[parent_num];
+        first_child[parent_num] = i;
     }
 
-    quicksort_graph(1, n-1);
+    if (DEBUG) printf("DONE! graph stored in memory\n");
 }
-/*
-void DFS_recursive(int v) {
-    sizes[v] = 1;
-    nodes_nums[v] = node_num_counter++;
 
-    // for each neighbour(v)
-    std::vector<int>::iterator u = adjacency_lists[v].begin();
-    for (; u != adjacency_lists[v].end(); ++u) {
-        if (visited[*u]) continue;
-        visited[*u] = TRUE;
-        parents[*u] = v;
-        DFS_recursive(*u);
-        sizes[v] += sizes[*u];
-    }
-}
-*/
 void DFS_iterative(int v) {
     /* Perform iterative depth first search on vertex v */
     std::stack<int> stack;
     stack.push(v);
+    time_in[v] = node_num_counter++;
 
     while (!stack.empty()) {
         v = stack.top();
-        stack.pop();
-        nodes_nums[v] = node_num_counter++;
-        sizes[v] = 1;
 
-        if (!visited[v]) {
-            visited[v] = TRUE;
-
-            // propagate sizes
-            int node = v;
-            while (node != ROOT) {
-                sizes[parents[node]] += sizes[v];
-                node = parents[node];
-            }
+        if (!time_out[v]) {
+            stack.pop();
+            time_out[v] = node_num_counter++;  // reflect actual time_out
+            continue;
         }
 
-        int child = binsearch_graph(1, n-1, v);
-        if (child == -1) continue;  // node is leaf
-        while (adjacency_lists[child][0] == v) {
-            int u = adjacency_lists[child++][1];
-            if (!visited[u]) {
-                parents[u] = v;
+        int u = first_child[v];
+        while (u != 0) {
+            if (time_in[u] == -1) {
+                time_in[u] = node_num_counter++;
                 stack.push(u);
+                time_out[v]--;  // time_out temporarily as children counter
+                break;
             }
+            u = neighbours[u];
         }
     }
 }
 
 int is_ancestor(int u, int v) {
     /* Return true if u is ancestor of v */
-    return nodes_nums[v] > nodes_nums[u] &&\
-           nodes_nums[v] < nodes_nums[u] + sizes[u];
+    return time_in[v] > time_in[u] &&\
+           time_in[v] < time_out[u];
 }
 
 void output_verbose_bool(int bool_val) {
@@ -163,26 +96,19 @@ void output_array(int *ptr, const char *label) {
 }
 
 void output_tree_state() {
-    output_array(sizes, "sizes");
-    output_array(parents, "parents");
-    output_array(nodes_nums, "nodes_nums");
-    /* output_array(visited, "visited"); */
+    output_array(time_out, "time_out");
+    output_array(time_in, "time_in");
 }
 
 int main() {
     scanf("%d %d", &n, &q);
     input_graph();
 
-    if (RECURSIVE)
-        /* DFS_recursive(ROOT); */
-        return 1;
-    else
-        DFS_iterative(ROOT);
+    DFS_iterative(ROOT);
 
-    if (DEBUG)
-        output_tree_state();
+    if (DEBUG) printf("DONE! DFS tree created\n");
+    if (DEBUG) output_tree_state();
 
     answer_queries();
     return 0;
 }
-

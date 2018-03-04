@@ -10,6 +10,7 @@ run_tests: clean main
 	./main < przyklad_B
 	./main < przyklad_C
 	./main < przyklad_D
+	./main < przyklad_E
 
 main: main.cpp
 	$(CC) $(CFLAGS) main.cpp -o main
