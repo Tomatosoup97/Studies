@@ -11,8 +11,8 @@ run_tests: clean main
 	./main < przyklad_C
 	./main < przyklad_D
 	./main < przyklad_E
-	./main < przyklad_F
-	./main < przyklad_G
+	./main < sooo_deep
+	./main < sunshine
 
 main: main.cpp
 	$(CC) $(CFLAGS) main.cpp -o main

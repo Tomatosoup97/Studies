@@ -55,7 +55,6 @@ void DFS_iterative(int v) {
     std::stack<int> stack;
     stack.push(v);
     time_in[v] = node_num_counter++;
-    int i = 0;
 
     while (!stack.empty()) {
         v = stack.top();
