@@ -1,18 +1,16 @@
 CC = gcc -g
-CFLAGS=-std=gnu99 -Wall -Wextra
+CFLAGS=-std=gnu99 -Wall -Wextra -Werror
 
-BINS = traceroute icmp_receive
+BINS = traceroute
 
 all: $(BINS)
 
 traceroute: traceroute.c
-
-icmp_receive: icmp_receive.c
 
 clean:
 	rm -vf $(BINS)
 	rm -vf *.o
 
 test: all
-	./traceroute 156.17.4.11
+	./traceroute 216.58.214.78
 

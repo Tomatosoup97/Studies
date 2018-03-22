@@ -7,6 +7,9 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/time.h>
+#include <inttypes.h>
+#include <math.h>
 
 #define TRUE 1
 #define FALSE 0
@@ -20,6 +23,8 @@
 
 #define DEBUG 0
 
+static int sequence_counter;
+
 void handle_error(char *err_msg) {
     const int BUFF_SIZE = 50;
     char err_str[BUFF_SIZE];
@@ -27,6 +32,7 @@ void handle_error(char *err_msg) {
     printf("Error occured. msg: %s, error: %s\n", err_str, err_msg);
     exit(EXIT_FAILURE);
 }
+
 
 uint16_t compute_icmp_checksum (const void *buff, int length) {
     uint32_t sum;
@@ -46,13 +52,12 @@ void print_as_bytes(unsigned char* buff, ssize_t length) {
 
 
 void send_icmp_request(int sockfd, int ttl, const char *ip_addr) {
-    static int count = 1;
 
     struct icmphdr icmp_header;
     icmp_header.type = ICMP_ECHO;
     icmp_header.code = NO_CODE;
     icmp_header.un.echo.id = getpid();
-    icmp_header.un.echo.sequence = count++;
+    icmp_header.un.echo.sequence = sequence_counter++;
     icmp_header.checksum = 0;
     icmp_header.checksum = compute_icmp_checksum((u_int16_t*) &icmp_header,
                                                  sizeof(icmp_header));
@@ -78,20 +83,21 @@ ssize_t receive_icmp_packet(int sockfd, u_int8_t *buffer, struct sockaddr_in *se
 
     ssize_t packet_len = recvfrom(
             sockfd, buffer,
-            IP_MAXPACKET, 0,
+            IP_MAXPACKET,
+            MSG_DONTWAIT,
+            /* 0, */
             (struct sockaddr*) sender,
             &sender_len
     );
 
-    if (packet_len < 0)
+    if (packet_len < 0 && errno != EWOULDBLOCK)
         handle_error("recvfrom error");
 
     return packet_len;
 }
 
-
-int select_icmp_packet(int sockfd) {
-    /* Wait up to MAX_SECS_TO_WAIT for receiving icmp packet
+int select_socket(int sockfd) {
+    /* Wait up to MAX_SECS_TO_WAIT for data arriving into socket
      * */
     fd_set descriptors;
     FD_ZERO(&descriptors);
@@ -120,6 +126,10 @@ int packet_reached_destination(struct icmphdr *icmp_header) {
            icmp_header->un.echo.id == getpid();
 }
 
+uint64_t timeval_us(struct timeval *tv) {
+    return (tv->tv_sec * (uint64_t)1000 * (uint64_t)1000 ) + (tv->tv_usec);
+}
+
 void output_icmp_packet(u_int8_t *buffer, struct icmphdr *icmp_header,
                         ssize_t ip_header_len, ssize_t packet_len) {
     printf ("IP header: ");
@@ -142,30 +152,103 @@ void output_icmp_packet(u_int8_t *buffer, struct icmphdr *icmp_header,
 
 }
 
-int handle_icmp_packet(int sockfd, u_int8_t *buffer, int TTL,
-                       const char *ip_addr, struct sockaddr_in *sender) {
-
-    send_icmp_request(sockfd, TTL, ip_addr);
-    int is_ready = select_icmp_packet(sockfd);
-    ssize_t packet_len;
-
-    switch (is_ready) {
-        case 0:
-            // timeout
-            packet_len = -1;
-            break;
-        case 1:
-            packet_len = receive_icmp_packet(sockfd, buffer, sender);
-            break;
-        default:
-            handle_error("select_icmp_packet");
-    }
-    return packet_len;
-}
-
 void help() {
     printf("usage: ./traceroute <ip-address>\n");
     exit(EXIT_FAILURE);
+}
+
+int process_icmp_hop(int sockfd, int TTL, const char *ip_addr) {
+    u_int8_t final_dest = FALSE;
+    u_int8_t buffer[IP_MAXPACKET];
+    struct timeval tv_start[3];
+    struct timeval tv_end[3];
+    ssize_t *packet_len = malloc(sizeof(int) * PACKETS_PER_TTL);
+    char sender_ip_str[20];
+    struct sockaddr_in sender;
+    uint64_t valid_packets = 0;
+    int packets_not_ready = 0;
+    int pid = getpid();
+
+
+    for (int i=0; i<PACKETS_PER_TTL; i++) {
+        // Send out 3 packets with same TTL
+        gettimeofday(&tv_start[i], NULL);
+        send_icmp_request(sockfd, TTL, ip_addr);
+    }
+
+    if (TTL < 10) printf(" ");
+    printf(" %d  ", TTL);
+
+    for (int i=0; i < PACKETS_PER_TTL; i++) {
+        // Try to receive 3 packets
+
+        int is_socket_ready = select_socket(sockfd);
+        if (is_socket_ready == -1)
+            handle_error("select_socket");
+
+        if (is_socket_ready == 0) {
+            packets_not_ready++;
+            continue;
+        }
+
+        packet_len[i] = receive_icmp_packet(sockfd, buffer, &sender);
+        gettimeofday(&tv_end[i], NULL);
+
+        struct ip *ip = (struct ip *) buffer;
+        int ip_header_len = ip->ip_hl << 2;
+        struct icmphdr *icmp_header = (struct icmphdr *) (buffer + ip_header_len);
+
+        u_int16_t icmp_pid;
+        u_int16_t icmp_sequence;
+
+        if (icmp_header->type == ICMP_TIME_EXCEEDED) {
+            struct iphdr* inside_ip_header = (struct iphdr*) ((u_int8_t*)icmp_header + 8);
+            u_int8_t * inside_icmp_packet = (u_int8_t*)inside_ip_header + 4 * inside_ip_header->ihl;
+            struct icmphdr* inside_icmp_header = (struct icmphdr*) inside_icmp_packet;
+
+            icmp_pid = inside_icmp_header->un.echo.id;
+            icmp_sequence = inside_icmp_header->un.echo.sequence;
+        }
+
+        if (icmp_header->type == ICMP_ECHOREPLY) {
+            icmp_pid = icmp_header->un.echo.id;
+            icmp_sequence = icmp_header->un.echo.sequence;
+        }
+
+        if (DEBUG)
+            output_icmp_packet(buffer, icmp_header, ip_header_len, packet_len[i]);
+
+        if (packet_reached_destination(icmp_header))
+            final_dest = TRUE;
+
+        if (packet_len[i] != -1) {
+            if (pid == icmp_pid && icmp_sequence >= sequence_counter - PACKETS_PER_TTL) {
+                valid_packets++;
+                extract_sender_ip_str(&sender, sender_ip_str, 20);
+                printf("%s  ", sender_ip_str);
+            } else {
+                i--;
+                continue;
+            }
+        }
+    }
+
+    if (packets_not_ready == 3)
+        printf("*");
+
+    uint64_t sum_latency = 0;
+    for (int i=0; i<PACKETS_PER_TTL; i++)
+        if (packet_len[i] != -1)
+            sum_latency += timeval_us(&tv_end[i]) - timeval_us(&tv_start[i]);
+
+    if (valid_packets) {
+        double avg_latency_us = sum_latency / valid_packets;
+        printf("  %.3lf ms", avg_latency_us / 1000);
+    }
+
+    printf("\n");
+
+    return final_dest;
 }
 
 int main(int argc, char *argv[]) {
@@ -181,43 +264,10 @@ int main(int argc, char *argv[]) {
     if (sockfd < 0)
         handle_error("socket");
 
-    for (int TTL = 1; TTL <= TTL_THRESHOLD; TTL++) {
-        u_int8_t buffer[IP_MAXPACKET];
-        ssize_t packet_len;
-        struct sockaddr_in sender;
-
-        /* for (int i=0; i<PACKETS_PER_TTL; i++) { */
-        /*     // Send 3 packets with same TTL */
-        /* } */
-
-        packet_len = handle_icmp_packet(sockfd, buffer, TTL, ip_addr, &sender);
-
-        if (packet_len == -1) {
-            // timeout
-            printf("%d. *\n", TTL);
-            continue;
-        }
-
-        char sender_ip_str[20];
-        extract_sender_ip_str(&sender, sender_ip_str, 20);
-
-        // TODO: how can i tell if incoming ICMP packet is mine?
-        printf("%d. %s\n", TTL, sender_ip_str);
-
-        struct iphdr *ip_header = (struct iphdr*) buffer;
-        ssize_t ip_header_len = 4 * ip_header->ihl;
-        u_int8_t *icmp_packet = buffer + ip_header_len;
-        struct icmphdr *icmp_header = (struct icmphdr*) icmp_packet;
-        struct icmp *icmp_content = (struct icmp*) (buffer + ip_header_len + sizeof(struct icmphdr));
-
-        // TODO: print latency for each ip_addr
-
-        if (DEBUG)
-            output_icmp_packet(buffer, icmp_header, ip_header_len, packet_len);
-
-        if (packet_reached_destination(icmp_header))
+    for (int TTL = 1; TTL <= TTL_THRESHOLD; TTL++)
+        if (process_icmp_hop(sockfd, TTL, ip_addr))
             break;
-    }
 
     return EXIT_SUCCESS;
 }
+
