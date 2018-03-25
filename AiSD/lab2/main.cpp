@@ -6,7 +6,7 @@
 #include <algorithm>
 
 #define MOD_NUM 999979
-#define DEBUG 1
+#define DEBUG 0
 
 int n, m, t;
 
@@ -21,9 +21,7 @@ typedef math_vector tunnel_t;
 
 struct vertex_meta_t {
     int tunnels_index;
-    int paths;
-    int parents_count;
-    bool was_visited;
+    int paths = 0;
 };
 
 std::queue<coords> BFSQ;
@@ -35,22 +33,8 @@ std::map<
     vertex_meta_t
 > places;
 
-void output_coords(const coords *c) {
-    printf("%d %d", c->first, c->second);
-}
-
-void output_tunnels() {
-    printf("Tunnels:\n");
-    for (auto const& tunnel: tunnels) {
-        output_coords(&tunnel.first);
-        printf("  ");
-        output_coords(&tunnel.second);
-        printf("\n");
-    }
-}
-
 void input_tunnels() {
-    scanf("%d %d %d", &n, &m, &t);
+    scanf("%d %d %d", &m, &n, &t);
 
     for (int i=0; i<t; i++) {
         coords from_place, to_place;
@@ -58,13 +42,24 @@ void input_tunnels() {
 
         scanf("%d %d", &from_place.first, &from_place.second);
         scanf("%d %d", &to_place.first, &to_place.second);
-        tunnel = std::make_pair(from_place, to_place);
+        // Store tunnels reversed
+        tunnel = std::make_pair(to_place, from_place);
         tunnels.push_back(tunnel);
     }
 }
 
 void sort_tunnels() {
     std::sort(tunnels.begin(), tunnels.end());
+}
+
+vertex_meta_t get_or_create_meta(coords v) {
+    vertex_meta_t vertex_meta = {-1, 0};
+    try {
+        places.at(v);
+    } catch (...) {
+        places[v] = vertex_meta;
+    }
+    return places[v];
 }
 
 void create_places_map() {
@@ -75,25 +70,11 @@ void create_places_map() {
         coords from_place = tunnel.first;
         coords to_place = tunnel.second;
 
-        vertex_meta_t vertex_meta = {-1, 0, 0, false};
+        get_or_create_meta(from_place);
+        get_or_create_meta(to_place);
 
-        try {
-            places.at(from_place);
-        } catch (...) {
-            places[from_place] = vertex_meta;
-        }
-
-        try {
-            places.at(to_place);
-        } catch (...) {
-            places[to_place] = vertex_meta;
-        }
-
-        places[to_place].parents_count++;
-
-        if (from_place != prev_place) {
+        if (from_place != prev_place)
             places[from_place].tunnels_index = index;
-        }
         prev_place = from_place;
         index++;
     }
@@ -103,72 +84,48 @@ void output_places_map() {
     printf("Map of places:\n");
 
     for (auto const& place: places)
-        printf("<%d, %d>: index: %d, paths: %d, parents: %d, was_visited: %d\n",
+        printf("<%d, %d>: index: %d, paths: %d\n",
                place.first.first, place.first.second,
                place.second.tunnels_index,
-               place.second.paths,
-               place.second.parents_count,
-               place.second.was_visited);
+               place.second.paths);
 }
 
-bool was_coords_visited(coords v) {
-    vertex_meta_t v_meta = places[v];
-    return v_meta.was_visited;
-}
-
-void mark_coords_visited(coords v) {
-    places[v].was_visited = true;
-}
-
-void bfs_count_paths() {
-    coords v;
-
-    while (BFSQ.empty() == false) {
-        coords child, from_tunnel;
-
-        v = BFSQ.front();
-        BFSQ.pop();
-
-        vertex_meta_t v_meta = places[v];
+void dynamic_calc_paths() {
+    for (auto const& place : places) {
+        coords parent;
+        coords v = place.first;
+        vertex_meta_t v_meta = place.second;
         int tunnels_index = v_meta.tunnels_index;
 
         while (tunnels[tunnels_index].first == v) {
-            child = tunnels[tunnels_index].second;
+            parent = tunnels[tunnels_index].second;
 
-            if (places[child].parents_count > 0) {
-                BFSQ.push(child);
-
-                if (places[v].parents_count == 0) {
-                    places[child].paths += places[v].paths % MOD_NUM;
-                    places[child].paths %= MOD_NUM;
-                    places[child].parents_count--;
-                }
-            }
+            places[v].paths += places[parent].paths % MOD_NUM;
+            places[v].paths %= MOD_NUM;
 
             tunnels_index++;
         }
     }
+
 }
 
 int main() {
-
     input_tunnels();
-    if (DEBUG) output_tunnels();
-
     sort_tunnels();
-    if (DEBUG) output_tunnels();
 
     create_places_map();
     if (DEBUG) output_places_map();
 
     coords S = std::make_pair(0, 0);
-    BFSQ.push(S);
-    mark_coords_visited(S);
     places[S].paths = 1;
-    bfs_count_paths();
+    dynamic_calc_paths();
+
     if (DEBUG) output_places_map();
 
-    printf("%d\n", places.rbegin()->second.paths);
+    coords F = std::make_pair(m, n);
+    vertex_meta_t F_meta = get_or_create_meta(F);
+    printf("%d\n", F_meta.paths);
+
     if (DEBUG) printf("\n\n");
     return 0;
 }
