@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <queue>
 #include <vector>
 #include <map>
 #include <utility>
@@ -7,7 +6,6 @@
 
 #define MOD_NUM 999979
 #define DEBUG 0
-
 int n, m, t;
 
 typedef std::pair<int, int> coords;
@@ -23,8 +21,6 @@ struct vertex_meta_t {
     int tunnels_index;
     int paths = 0;
 };
-
-std::queue<coords> BFSQ;
 
 std::vector<tunnel_t> tunnels;
 
@@ -106,23 +102,23 @@ void dynamic_calc_paths() {
             tunnels_index++;
         }
     }
-
 }
 
 int main() {
     input_tunnels();
     sort_tunnels();
 
+    coords S = std::make_pair(0, 0);
+    coords F = std::make_pair(m, n);
+
     create_places_map();
     if (DEBUG) output_places_map();
 
-    coords S = std::make_pair(0, 0);
     places[S].paths = 1;
     dynamic_calc_paths();
 
     if (DEBUG) output_places_map();
 
-    coords F = std::make_pair(m, n);
     vertex_meta_t F_meta = get_or_create_meta(F);
     printf("%d\n", F_meta.paths);
 
