@@ -1,4 +1,5 @@
 # Studies
+
 Resources and solutions for exercises for each programming subject at my univeristy.
 
 ## Selected projects
@@ -28,4 +29,8 @@ https://github.com/Tomatosoup97/ApplicationSecurity
     - `posix_memalign`, `malloc`, `calloc`, `realloc`, `free` according to POSIX standards
 
 - [ext2 file system](https://github.com/Tomatosoup97/ext2-fs)
+
+### Computer Networking
+
+- [Traceroute implementation](./Sieci_Komputerowe/traceroute)
 
