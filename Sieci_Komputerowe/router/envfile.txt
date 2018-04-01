@@ -1,0 +1,3 @@
+# Test suite directory with distances config
+TEST_SUITE=test1
+

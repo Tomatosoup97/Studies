@@ -1,0 +1,87 @@
+# vim: set ts=2 sw=2 et:
+
+version: '3'
+services:
+  a:
+    build: .
+    hostname: a
+    environment:
+      - MACHINE_NAME=a
+    env_file:
+      - ./envfile.txt
+    volumes:
+      - .:/sources
+    networks:
+      ab:
+        ipv4_address: 172.16.1.13
+    restart: on-failure
+
+  b:
+    build: .
+    hostname: b
+    environment:
+      - MACHINE_NAME=b
+    volumes:
+      - .:/sources
+    networks:
+      ab:
+        ipv4_address: 172.16.1.14
+      bc:
+        ipv4_address: 192.168.2.10
+      bd:
+        ipv4_address: 10.0.1.2
+    restart: on-failure
+
+  c:
+    build: .
+    hostname: c
+    environment:
+      - MACHINE_NAME=c
+    volumes:
+      - .:/sources
+    networks:
+      bc:
+        ipv4_address: 192.168.2.5
+      cd:
+        ipv4_address: 192.168.5.5
+    restart: on-failure
+
+  d:
+    build: .
+    hostname: d
+    environment:
+      - MACHINE_NAME=d
+    volumes:
+      - .:/sources
+    networks:
+      bd:
+        ipv4_address: 10.0.1.1
+      cd:
+        ipv4_address: 192.168.5.43
+    restart: on-failure
+
+networks:
+  ab:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.16.0.0/16
+
+  bc:
+    internal: true
+    ipam:
+      config:
+        - subnet: 192.168.2.0/24
+
+  bd:
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.0.0.0/8
+
+  cd:
+    internal: true
+    ipam:
+      config:
+        - subnet: 192.168.5.0/24
+
