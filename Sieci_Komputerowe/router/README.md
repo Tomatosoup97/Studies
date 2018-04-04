@@ -13,8 +13,8 @@ Configure current test case in envfile.txt
 
 Run in background or in separate terminals:
 
-    sh run.sh a
-    sh run.sh b
-    sh run.sh c
-    sh run.sh d
+    sh run.sh test1 a
+    sh run.sh test1 b
+    sh run.sh test1 c
+    sh run.sh test1 d
 

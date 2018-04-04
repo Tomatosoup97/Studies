@@ -1,11 +1,11 @@
-CC = gcc -g
+CC = gcc
 CFLAGS=-std=gnu99 -Wall -Wextra
 
 BINS = router
 
-all: $(BINS)
+all: clean $(BINS)
 
-router: router.o table.o
+router: router.o udp.o table.o
 
 clean:
 	rm -vf $(BINS)
@@ -13,6 +13,5 @@ clean:
 
 test: export MACHINE_NAME=test
 test: clean all
-	./router < ../test1/a
 	./router < ../test1/b
 
