@@ -4,8 +4,7 @@ Simple implementation of distance-vector routing protocol
 
 ### Build
 
-    docker-compose build
-    docker-compose up
+    sh rebuild.sh
 
 ### Test case
 
