@@ -7,6 +7,15 @@
 #include <errno.h>
 #include "udp.h"
 
+ip_addr_t translate_to_network_addr(ip_addr_t *addr, int mask_len) {
+    ip_addr_t network;
+    uint32_t router_addr_host = ntohl(addr->s_addr);
+    uint32_t network_addr_host = get_network_addr(router_addr_host,
+                                                  mask_len);
+    network.s_addr = htonl(network_addr_host);
+    return network;
+}
+
 void send_udp_packet(int sockfd, ip_addr_t ip_addr, uint8_t *buffer, ssize_t buff_len) {
     struct sockaddr_in recipent_addr;
     bzero(&recipent_addr, sizeof(recipent_addr));

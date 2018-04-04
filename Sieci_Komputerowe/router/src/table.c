@@ -3,11 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <inttypes.h>
-#include "table.h"
-#include "udp.h"
 #include "common.h"
+#include "table.h"
 
 
 void init_routing_table(routing_table_t *table, int max_size) {
@@ -20,53 +18,6 @@ void show_routing_table(routing_table_t *table) {
         show_node(&table->nodes[i]);
 }
 
-void show_node(node_t *node) {
-    ip_addr_v router_addr, network_addr;
-    char connection_msg[64];
-    char distance_msg[64];
-
-    inet_ntop(AF_INET, &node->router_addr.s_addr, router_addr.ip, 32);
-    inet_ntop(AF_INET, &node->network_addr.s_addr, network_addr.ip, 32);
-
-    sprintf(connection_msg,
-            node->conn_type == CONN_DIRECT ? "connected directly" : "via %s",
-            router_addr.ip);
-    sprintf(distance_msg,
-            node->reachability == UNREACHABLE ? "unreachable" : "distance %d",
-            node->distance);
-
-    printf("%s %s %s\n", network_addr.ip, distance_msg, connection_msg);
-}
-
-void read_node(node_t *node) {
-    ip_addr_v ip_addr;
-    scanf("%s %*s %d", ip_addr.ip, &node->distance);
-
-    char *subnet_mask_str = strchr(ip_addr.ip, '/')+1;
-    char *router_addr = strtok(ip_addr.ip, "/");
-
-    sscanf(subnet_mask_str, "%" SCNu16, &node->subnet_mask_len);
-    inet_pton(AF_INET, router_addr, &node->router_addr);
-
-    uint32_t router_addr_host = ntohl(node->router_addr.s_addr);
-    uint32_t network_addr_host = get_network_addr(router_addr_host,
-                                                  node->subnet_mask_len);
-
-    node->network_addr.s_addr = htonl(network_addr_host);
-    node->conn_type = CONN_DIRECT;
-    node->reachability = INITIAL_REACHABILITY;
-}
-
-void read_node_from_socket(int sockfd, node_t *node) {
-    uint8_t buffer[IP_MAXPACKET+1];
-    ip_addr_t sender_ip_addr;
-
-    sender_ip_addr = receive_udp_packet(sockfd, buffer, IP_MAXPACKET);
-    decode_udp_payload(node, buffer);
-    node->router_addr = sender_ip_addr;
-    node->conn_type = CONN_INDIRECT;
-    node->reachability = INITIAL_REACHABILITY;
-}
 
 int find_fst_free_slot(routing_table_t *table) {
     for (int i=0; i<table->max_size; i++)
@@ -82,6 +33,13 @@ int find_node_by_network_addr(routing_table_t *table, ip_addr_t *addr) {
     return -1;
 }
 
+int find_node_by_router_addr(routing_table_t *table, ip_addr_t *addr) {
+    for (int i=0; i<table->max_size; i++)
+        if (table->nodes[i].router_addr.s_addr == addr->s_addr)
+            return i;
+    return -1;
+}
+
 void append_node_to_table(routing_table_t *table, node_t *node) {
     int free_slot = find_fst_free_slot(table);
     if (free_slot == -1) handle_error("no free slots in table");
@@ -89,8 +47,34 @@ void append_node_to_table(routing_table_t *table, node_t *node) {
     table->nodes_count++;
 }
 
+int match_ip_with_network(routing_table_t *table, ip_addr_t *addr) {
+    int longest_subnet = -1;
+    int best_match = -1;
+    ip_addr_t network_addr;
+
+    for (int i=0; i<table->nodes_count; i++) {
+        node_t node = table->nodes[i];
+        if (node.conn_type != CONN_DIRECT) continue;
+        network_addr = translate_to_network_addr(addr, node.subnet_mask_len);
+        if (node.network_addr.s_addr == network_addr.s_addr &&
+                longest_subnet < node.subnet_mask_len)
+            best_match = i;
+    }
+    return best_match;
+}
+
+void calc_node_actual_distance(routing_table_t *table, node_t *new_node) {
+    int network_match_idx = match_ip_with_network(table, &new_node->router_addr);
+    if (network_match_idx == -1) handle_error("router does not match any network");
+    node_t router_node = table->nodes[network_match_idx];
+    new_node->distance += router_node.distance;
+}
+
 void update_node_in_table(routing_table_t *table, node_t *new_node) {
     int curr_node_idx = find_node_by_network_addr(table, &new_node->network_addr);
+
+    if (new_node->conn_type == CONN_INDIRECT)
+        calc_node_actual_distance(table, new_node);
 
     if (curr_node_idx == -1) {
         append_node_to_table(table, new_node);
@@ -98,5 +82,11 @@ void update_node_in_table(routing_table_t *table, node_t *new_node) {
                table->nodes[curr_node_idx].conn_type != CONN_DIRECT) {
         table->nodes[curr_node_idx] = *new_node;
     }
+}
+
+int determine_conn_type(routing_table_t *table, node_t *node) {
+    int curr_node_idx = find_node_by_network_addr(table, &node->network_addr);
+    if (curr_node_idx == -1) return CONN_INDIRECT;
+    return table->nodes[curr_node_idx].conn_type;
 }
 

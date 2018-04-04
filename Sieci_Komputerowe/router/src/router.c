@@ -8,6 +8,7 @@
 #include <errno.h>
 #include "common.h"
 #include "udp.h"
+#include "node.h"
 #include "table.h"
 
 #define MAX_TABLE_SIZE 32
@@ -41,6 +42,7 @@ void update_distance_vector(int sockfd, routing_table_t *table) {
     while ((is_socket_ready = select_socket(sockfd, 0, MAX_PACKET_WAIT_MS))) {
         if (is_socket_ready == -1) handle_error("select");
         read_node_from_socket(sockfd, &new_node);
+        new_node.conn_type = determine_conn_type(table, &new_node);
         update_node_in_table(table, &new_node);
     }
 }
@@ -64,9 +66,9 @@ int main() {
     int receive_sockfd = bind_socket();
 
     while (TRUE) {
-        show_routing_table(&routing_table);
         propagate_distance_vector(bcast_sockfd, &routing_table);
         update_distance_vector(receive_sockfd, &routing_table);
+        show_routing_table(&routing_table);
         printf("\n\n");
         sleep(PROPAGATE_INTERVAL);
     }

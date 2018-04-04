@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "table.h"
+#include "node.h"
 
 #define LISTENING_PORT 54321
 
@@ -16,6 +17,8 @@
     inet_ntop(AF_INET, &addr, ip_addr.ip, 32);\
     printf(str, ip_addr.ip);\
 })
+
+ip_addr_t translate_to_network_addr(ip_addr_t *addr, int mask_len);
 
 void send_udp_packet(int sockfd, ip_addr_t ip_addr, uint8_t *buffer, ssize_t buff_len);
 ip_addr_t receive_udp_packet(int sockfd, uint8_t *buffer, size_t buff_len);

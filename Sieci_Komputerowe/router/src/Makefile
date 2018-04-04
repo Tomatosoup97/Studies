@@ -5,7 +5,7 @@ BINS = router
 
 all: clean $(BINS)
 
-router: router.o udp.o table.o
+router: router.o udp.o table.o node.o
 
 clean:
 	rm -vf $(BINS)
