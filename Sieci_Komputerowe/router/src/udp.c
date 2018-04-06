@@ -16,6 +16,13 @@ ip_addr_t translate_to_network_addr(ip_addr_t *addr, int mask_len) {
     return network;
 }
 
+ip_addr_t translate_to_broadcast_addr(ip_addr_t *addr, int mask_len) {
+    ip_addr_t broadcast_addr;
+    uint32_t addr_host = ntohl(addr->s_addr);
+    broadcast_addr.s_addr = htonl(calc_broadcast_addr(addr_host, mask_len));
+    return broadcast_addr;
+}
+
 void send_udp_packet(int sockfd, ip_addr_t ip_addr, uint8_t *buffer, ssize_t buff_len) {
     struct sockaddr_in recipent_addr;
     bzero(&recipent_addr, sizeof(recipent_addr));
@@ -23,20 +30,12 @@ void send_udp_packet(int sockfd, ip_addr_t ip_addr, uint8_t *buffer, ssize_t buf
     recipent_addr.sin_port = htons(LISTENING_PORT);
     recipent_addr.sin_addr.s_addr = ip_addr.s_addr;
 
-    // send through localhost:
-    // inet_pton(AF_INET, "127.0.0.1", &server_address.sin_addr);
-
     ssize_t message_len = sendto(
         sockfd, buffer, buff_len, 0,
         (struct sockaddr*) &recipent_addr,
         sizeof(recipent_addr)
     );
     if (message_len != buff_len) handle_error("sendto error");
-    if (DEBUG) {
-        printf("UDP packet of size %ld ", buff_len);
-        printf_ip_addr("was sent to %s. Payload: ", ip_addr);
-        print_buff(buffer, buff_len);
-    }
 }
 
 ip_addr_t receive_udp_packet(int sockfd, uint8_t *buffer, size_t buff_len) {
@@ -53,11 +52,6 @@ ip_addr_t receive_udp_packet(int sockfd, uint8_t *buffer, size_t buff_len) {
     char sender_ip_str[20];
     inet_ntop(AF_INET, &(sender.sin_addr), sender_ip_str, sizeof(sender_ip_str));
 
-    if (DEBUG) {
-        printf("Received UDP packet from IP addr: %s, %ld-byte message: ",
-               sender_ip_str, datagram_len);
-        print_buff(buffer, datagram_len);
-    }
     fflush(stdout);
     return sender.sin_addr;
 }

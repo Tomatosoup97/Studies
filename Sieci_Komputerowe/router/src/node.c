@@ -18,16 +18,19 @@ void show_node(node_t *node) {
             node->conn_type == CONN_DIRECT ? "connected directly" : "via %s",
             router_addr.ip);
     sprintf(distance_msg,
-            node->reachability == UNREACHABLE ? "unreachable" : "distance %d",
+            node->distance == UNREACHABLE ? "unreachable" : "distance %u",
             node->distance);
 
-    printf("%s/%d %s %s\n", network_addr.ip, node->subnet_mask_len,
+
+    printf("%s/%d %s %s", network_addr.ip, node->subnet_mask_len,
                             distance_msg, connection_msg);
+    if (VERBOSE) printf(" reachability %d", node->reachability);
+    printf("\n");
 }
 
 void read_node(node_t *node) {
     ip_addr_v ip_addr;
-    scanf("%s %*s %d", ip_addr.ip, &node->distance);
+    scanf("%s %*s %u", ip_addr.ip, &node->distance);
 
     char *subnet_mask_str = strchr(ip_addr.ip, '/') + 1;
     char *router_addr = strtok(ip_addr.ip, "/");
@@ -51,6 +54,6 @@ void read_node_from_socket(int sockfd, node_t *node) {
 
     decode_udp_payload(node, buffer);
     node->router_addr = sender_ip_addr;
-    node->reachability = INITIAL_REACHABILITY;
+    node->reachability = node->distance == UNREACHABLE ? 0 : INITIAL_REACHABILITY;
 }
 

@@ -8,7 +8,10 @@
 
 #define TRUE 1
 #define FALSE 0
+
+// Program flags
 #define DEBUG 0
+#define VERBOSE 1
 
 #define last_k_bits_mask(k) (~((1 << (32 - (k))) - 1))
 

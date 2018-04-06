@@ -5,6 +5,11 @@
 #include "table.h"
 #include "udp.h"
 
+#define INFINITE_DISTANCE 16
+#define UNREACHABLE UINT_MAX
+#define MIN_REACHABILITY (-3)
+#define INITIAL_REACHABILITY 3
+
 typedef struct {
     char ip[32];
 } ip_addr_v;
