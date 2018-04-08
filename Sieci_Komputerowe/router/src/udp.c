@@ -23,19 +23,18 @@ ip_addr_t translate_to_broadcast_addr(ip_addr_t *addr, int mask_len) {
     return broadcast_addr;
 }
 
-void send_udp_packet(int sockfd, ip_addr_t ip_addr, uint8_t *buffer, ssize_t buff_len) {
+ssize_t send_udp_packet(int sockfd, ip_addr_t ip_addr, uint8_t *buffer, ssize_t buff_len) {
     struct sockaddr_in recipent_addr;
     bzero(&recipent_addr, sizeof(recipent_addr));
     recipent_addr.sin_family = AF_INET;
     recipent_addr.sin_port = htons(LISTENING_PORT);
     recipent_addr.sin_addr.s_addr = ip_addr.s_addr;
 
-    ssize_t message_len = sendto(
+    return sendto(
         sockfd, buffer, buff_len, 0,
         (struct sockaddr*) &recipent_addr,
         sizeof(recipent_addr)
     );
-    if (message_len != buff_len) handle_error("sendto error");
 }
 
 ip_addr_t receive_udp_packet(int sockfd, uint8_t *buffer, size_t buff_len) {

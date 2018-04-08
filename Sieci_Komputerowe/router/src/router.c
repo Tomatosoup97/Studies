@@ -11,13 +11,13 @@
 
 #define MAX_TABLE_SIZE 32
 #define PROPAGATE_INTERVAL 3
-#define DIST_VECTOR_EL_SIZE 9
+#define PACKET_SIZE 9
 #define MAX_PACKET_WAIT_MS 150
-
 
 void propagate_distance_vector(int sockfd, routing_table_t *table) {
     int i, j;
-    uint8_t buffer[DIST_VECTOR_EL_SIZE];
+    int message_len;
+    uint8_t buffer[PACKET_SIZE];
     ip_addr_t broadcast_addr;
 
     for (i=0; i<table->nodes_count; i++) {
@@ -28,9 +28,16 @@ void propagate_distance_vector(int sockfd, routing_table_t *table) {
                                                      direct_node.subnet_mask_len);
 
         FOR_EACH_AVAILABLE_NODE(table, j) {
-            node_t node = table->nodes[j];
-            encode_udp_payload(&node, buffer);
-            send_udp_packet(sockfd, broadcast_addr, buffer, DIST_VECTOR_EL_SIZE);
+            node_t *node = &table->nodes[j];
+            encode_udp_payload(node, buffer);
+            message_len = send_udp_packet(sockfd, broadcast_addr, buffer, PACKET_SIZE);
+
+            if (message_len != PACKET_SIZE) {
+                if (errno == ENOTCONN || errno == ENETUNREACH || errno == EHOSTUNREACH)
+                    node->reachability--;
+                else
+                    handle_error("sendto error");
+            }
         }
     }
 }
@@ -51,7 +58,6 @@ void update_distance_vector(int sockfd, routing_table_t *table) {
 
 void update_reachability(routing_table_t *table) {
     int i;
-    // TODO: doesn't work correctly on `via` connections
     FOR_EACH_AVAILABLE_NODE(table, i) {
         if (table->nodes[i].reachability > MIN_REACHABILITY &&
             --table->nodes[i].reachability <= 0) {

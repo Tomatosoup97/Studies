@@ -70,7 +70,7 @@ int match_ip_with_network(routing_table_t *table, ip_addr_t *addr) {
     return best_match;
 }
 
-void calc_node_actual_distance(routing_table_t *table, node_t *new_node) {
+void calc_node_transitive_distance(routing_table_t *table, node_t *new_node) {
     int network_match_idx = match_ip_with_network(table, &new_node->router_addr);
     if (network_match_idx == -1) handle_error("router does not match any network");
     node_t *router_node = &table->nodes[network_match_idx];
@@ -99,27 +99,35 @@ int is_new_node_superior(node_t *old_node, node_t *new_node) {
            old_node->conn_type != CONN_DIRECT;
 }
 
+void process_update_from_source(routing_table_t *table, node_t *curr_node, node_t *new_node) {
+    if (new_node->conn_type == CONN_DIRECT && curr_node->distance == UNREACHABLE)
+        curr_node->distance = new_node->distance;
+
+    if (new_node->distance >= INFINITE_DISTANCE ||
+            curr_node->distance >= INFINITE_DISTANCE)
+        set_node_unreachable(table, curr_node);
+    else
+        curr_node->reachability = MAX_REACHABILITY;
+}
+
 void update_node_in_table(routing_table_t *table, node_t *new_node) {
     int curr_node_idx = find_node_by_network_addr(table, &new_node->network_addr);
 
     if (new_node->conn_type == CONN_INDIRECT)
-        calc_node_actual_distance(table, new_node);
+        calc_node_transitive_distance(table, new_node);
 
     if (curr_node_idx == -1 && new_node->distance != UNREACHABLE) {
         append_node_to_table(table, new_node);
         return;
     }
-    if (is_new_node_superior(&table->nodes[curr_node_idx], new_node)) {
+
+    node_t *curr_node = &table->nodes[curr_node_idx];
+
+    if (is_new_node_superior(curr_node, new_node))
         table->nodes[curr_node_idx] = *new_node;
-    }
-    if (is_node_connection_source(table, &table->nodes[curr_node_idx], new_node)) {
-        node_t *curr_node = &table->nodes[curr_node_idx];
-        if (new_node->distance >= INFINITE_DISTANCE ||
-                curr_node->distance >= INFINITE_DISTANCE)
-            set_node_unreachable(table, curr_node);
-        else
-            curr_node->reachability = INITIAL_REACHABILITY;
-    }
+
+    if (is_node_connection_source(table, curr_node, new_node))
+        process_update_from_source(table, curr_node, new_node);
 }
 
 int determine_conn_type(routing_table_t *table, node_t *node) {

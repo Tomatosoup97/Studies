@@ -23,8 +23,10 @@ void show_node(node_t *node) {
 
 
     printf("%s/%d %s %s", network_addr.ip, node->subnet_mask_len,
-                            distance_msg, connection_msg);
-    if (VERBOSE) printf(" reachability %d", node->reachability);
+                          distance_msg, connection_msg);
+
+    if (VERBOSE && node->reachability != MAX_REACHABILITY)
+        printf(" reachability %d", node->reachability);
     printf("\n");
 }
 
@@ -43,7 +45,7 @@ void read_node(node_t *node) {
 
     node->network_addr.s_addr = network_addr.s_addr;
     node->conn_type = CONN_DIRECT;
-    node->reachability = INITIAL_REACHABILITY;
+    node->reachability = MAX_REACHABILITY;
 }
 
 void read_node_from_socket(int sockfd, node_t *node) {
@@ -54,6 +56,6 @@ void read_node_from_socket(int sockfd, node_t *node) {
 
     decode_udp_payload(node, buffer);
     node->router_addr = sender_ip_addr;
-    node->reachability = node->distance == UNREACHABLE ? 0 : INITIAL_REACHABILITY;
+    node->reachability = node->distance == UNREACHABLE ? 0 : MAX_REACHABILITY;
 }
 

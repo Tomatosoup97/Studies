@@ -7,8 +7,8 @@
 
 #define INFINITE_DISTANCE 16
 #define UNREACHABLE UINT_MAX
-#define MIN_REACHABILITY (-3)
-#define INITIAL_REACHABILITY 3
+#define MIN_REACHABILITY (-4)
+#define MAX_REACHABILITY 4
 
 typedef struct {
     char ip[32];
