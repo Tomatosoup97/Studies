@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #define DEBUG 0
 
@@ -38,9 +39,9 @@
 
 typedef struct node {
     long long key;
-    node *right;
-    node *left;
-    node *parent;
+    struct node *right;
+    struct node *left;
+    struct node *parent;
     int priority;
 } node_t;
 
