@@ -4,9 +4,6 @@ Resources and solutions for exercises for each programming subject at my univeri
 
 ## Selected projects
 
-*Introduction to programming in C* end of term project:
-https://github.com/Tomatosoup97/Web-Server
-
 *Application Security* in separate repository:
 https://github.com/Tomatosoup97/ApplicationSecurity
 
@@ -21,6 +18,9 @@ https://github.com/Tomatosoup97/ApplicationSecurity
 - [HDML language parser](./Metody_Programowania/Solutions/Prolog/HDMLParser/main.pl)
     - language for verifying digital circuits (Verilog alike)
 
+- [Xi-Language compiler in Ocaml](./Compiler_Construction/xi-lang)
+
+
 ### Operating systems & Computer Architecture
 
 - [ASM lab](./ASK/Solutions/set7)
@@ -33,6 +33,7 @@ https://github.com/Tomatosoup97/ApplicationSecurity
 ### Computer Networking
 
 - [Traceroute](./Sieci_Komputerowe/traceroute)
+- [Web server](https://github.com/Tomatosoup97/Web-Server)
 - [RIP (Routing Information Protocol)](./Sieci_Komputerowe/router)
     - Implementation of a routing protocol based on distance-vector algorithm
 
