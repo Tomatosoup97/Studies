@@ -6,7 +6,7 @@
   (* Lexing z biblioteki standardowej ocamla *)
   open Lexing
 
-  (* Standardowo w YACC-podobnych narzędziach  to lekser jest uzależniony od parsera. To znaczy, że typ 
+  (* Standardowo w YACC-podobnych narzędziach  to lekser jest uzależniony od parsera. To znaczy, że typ
    * danych z tokenami definiuje moduł wygenerowany na bazie grammar.mly. Definiujemy alias na typ
    * tokenu na potrzeby interfejsów Xi_lib.Iface *)
   type token = Parser.token
@@ -15,8 +15,8 @@
   let handleError pos token =
       let exc = InvalidToken (mkLocation pos, token) in
       raise exc
-      
-  (* vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv 
+
+  (* vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
    * Miejsce na twój kod w Ocamlu
    *)
 
@@ -25,13 +25,13 @@
      ----------------------------------------------------------------------------- *)
 
   }
-  
-  (* vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv 
+
+  (* vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
    * Miejsce na nazwane wyrażenia regularne
    *)
 
   let identifier    = ['a'-'z' '_' 'A' - 'Z']['_' 'A' - 'Z' 'a'-'z' '0'-'9']*
-  
+
   (* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
      ----------------------------------------------------------------------------- *)
 
@@ -60,13 +60,13 @@
 
       (* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
          ----------------------------------------------------------------------------- *)
-  
+
       | _
       { handleError (Lexing.lexeme_start_p lexbuf) (Lexing.lexeme lexbuf) }
 
   (* Pomocniczy stan aby wygodnie i prawidłowo obsłużyć komentarze *)
   and line_comment = parse
-      | '\n' 
+      | '\n'
       { new_line lexbuf; token lexbuf }
 
       (* Niektóre edytory nie wstawiają znaku końca wiersza w ostatniej linijce, jesteśmy
@@ -75,5 +75,6 @@
       | eof
       { EOF }
 
-      | _ 
+      | _
       { line_comment lexbuf }
+

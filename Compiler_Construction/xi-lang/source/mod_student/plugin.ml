@@ -59,3 +59,4 @@ module Plugin : PLUGIN = struct
 end
 
 module RegisterMyPlugin = RegisterPlugin(Plugin)
+

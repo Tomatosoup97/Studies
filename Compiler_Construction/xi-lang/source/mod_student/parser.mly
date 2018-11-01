@@ -1,5 +1,5 @@
 (*
- * Menhir wygeneruje funkcję o nazwie file 
+ * Menhir wygeneruje funkcję o nazwie file
  *)
 %start <Xi_lib.Ast.module_definition> file
 
@@ -16,7 +16,7 @@ let mkTag =
         incr i;
         NodeTag tag
 
-(* vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv 
+(* vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
  * Miejsce na twój kod w Ocamlu
  *)
 
@@ -25,7 +25,7 @@ let mkTag =
 
 %}
 
-(* vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv 
+(* vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
  * Miejsce na dyrektywy
  *)
 
@@ -37,7 +37,7 @@ let mkTag =
 
 %%
 
-(* vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv 
+(* vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
  * Miejsce na gramatykę
  *)
 
@@ -52,8 +52,8 @@ identifier:
     | IDENTIFIER
     { Identifier $1 }
 
-(* 
-   ** przykład użycia mkLocation 
+(*
+   ** przykład użycia mkLocation
 
     use_declaration:
         | USE suffix(identifier, opt(SEMICOLON))
@@ -68,3 +68,4 @@ identifier:
 
 (* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    ----------------------------------------------------------------------------- *)
+
