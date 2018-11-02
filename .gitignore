@@ -19,4 +19,5 @@ node_modules
 *.tar.bz2
 
 .vagrant
+_build
 
