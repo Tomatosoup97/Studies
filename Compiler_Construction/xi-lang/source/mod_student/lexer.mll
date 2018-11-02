@@ -1,77 +1,86 @@
+(* vim: set ts=2 sw=2: *)
 {
   open Xi_lib
   open Parser
   open Parser_utils
-
-  (* Lexing z biblioteki standardowej ocamla *)
   open Lexing
 
-  (* Standardowo w YACC-podobnych narzędziach  to lekser jest uzależniony od parsera. To znaczy, że typ
-   * danych z tokenami definiuje moduł wygenerowany na bazie grammar.mly. Definiujemy alias na typ
-   * tokenu na potrzeby interfejsów Xi_lib.Iface *)
   type token = Parser.token
 
-  (* Obsługa błędu *)
   let handleError pos token =
       let exc = InvalidToken (mkLocation pos, token) in
       raise exc
 
-  (* vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-   * Miejsce na twój kod w Ocamlu
-   *)
-
-
-  (* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     ----------------------------------------------------------------------------- *)
-
   }
 
-  (* vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-   * Miejsce na nazwane wyrażenia regularne
-   *)
-
+  let whitespace = [' ' '\t' '\n' '\r']
+  let digit = ['0'-'9']
   let identifier    = ['a'-'z' '_' 'A' - 'Z']['_' 'A' - 'Z' 'a'-'z' '0'-'9']*
 
-  (* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     ----------------------------------------------------------------------------- *)
-
-
   rule token = parse
-      (* Trzeba pamiętać aby uaktualnić pozycje w lexbuf, gdy widzimy znak końca wiersza.
-       * To się samo nie robi. Moduł Lexing z standardowej biblioteki daje do tego wygodną
-       * funkcję new_line.
-       *)
       | ['\n']
       { new_line lexbuf; token lexbuf }
 
-      (* widzimy początek komentarza i przechodzimy do pomocniczego stanu *)
+      | whitespace+
+      { token lexbuf }
+
       | "//"
       { line_comment lexbuf }
 
       | eof
       { EOF }
 
-      (* vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv 
-       * Miejsce na twoje reguły
-       *)
+      | '+'         { PLUS }
+      | '-'         { MINUS }
+      | "*>>"       { HIGH_MULT }
+      | '*'         { MULT }
+      | '/'         { DIV }
+      | '%'         { MOD }
+      | '&'         { BIN_AND }
+      | '|'         { BIN_OR }
+      | '!'         { BIN_NEG }
+      | '('         { LPAREN }
+      | ')'         { RPAREN }
+      | '{'         { LBRACE }
+      | '}'         { RBRACE }
+      (*| "[]"        { ARRAY }*)
+      | '['         { LBRACKET }
+      | ']'         { RBRACKET }
+      | ','         { COMMA }
+      | ':'         { COLON }
+      | ';'         { SEMICOLON }
+      | "=="        { EQ }
+      | "!="        { NEQ }
+      | "<="        { LTE }
+      | '<'         { LT }
+      | ">="        { GTE }
+      | '>'         { GT }
+      | '='         { ASSIGN }
+      | "true"      { BOOL (true) }
+      | "false"     { BOOL (false) }
+      | "length"    { LENGTH }
+      | "int"       { INT_T }
+      | "bool"      { BOOL_T }
+      | "if"        { IF }
+      | "else"      { ELSE }
+      | "while"     { WHILE }
+      | "return"    { RET }
+      | "'"         { APOSTROPHE }
+      | '"'         { QUOT_MARK }
 
       | identifier as id
-      { failwith id }
+      { IDENTIFIER (id) }
 
-      (* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-         ----------------------------------------------------------------------------- *)
+      | digit+
+      { INT (Int32.of_int (int_of_string (Lexing.lexeme lexbuf))) }
 
       | _
       { handleError (Lexing.lexeme_start_p lexbuf) (Lexing.lexeme lexbuf) }
 
-  (* Pomocniczy stan aby wygodnie i prawidłowo obsłużyć komentarze *)
   and line_comment = parse
       | '\n'
       { new_line lexbuf; token lexbuf }
 
-      (* Niektóre edytory nie wstawiają znaku końca wiersza w ostatniej linijce, jesteśmy
-       * przygotowani na obsługę takiego komentarza.
-       *)
       | eof
       { EOF }
 
