@@ -5,7 +5,6 @@ open Xi_lib
 open Ast
 open Parser_utils
 
-(* Tags generator *)
 let mkTag =
     let i = ref 0 in
     fun () ->
@@ -25,7 +24,7 @@ let mkUnaryOp = fun stp -> fun op -> fun sub -> EXPR_Unop {
     tag=mkTag (); loc=mkLocation stp; op=op; sub=sub
 }
 
-let mkLetStmt = fun stp -> fun cond -> fun tE -> fun fE -> STMT_If {
+let mkIfStmt = fun stp -> fun cond -> fun tE -> fun fE -> STMT_If {
     loc=mkLocation stp;
     cond=cond;
     then_branch=tE;
@@ -135,58 +134,29 @@ statement_block:
     | LBRACE sts=statement* RBRACE
     { STMTBlock { loc=mkLocation $startpos; body=sts } }
 
-(* TODO: >Each statement in a block may be terminated by a semicolon
- * - right now every statement can be terminated by a semicolon - not only in a block
+(* TODO: "Each statement in a block may be terminated by a semicolon"
+ * Right now every statement can be terminated by a semicolon - not only in a block
  * *)
 statement:
     | dangling_if_stmt SEMICOLON?       { $1 }
     | no_dangling_if_stmt SEMICOLON?    { $1 }
 
-(* TODO: the grammar below looks ugly *)
 dangling_if_stmt:
     | IF LPAREN cond=expression RPAREN tE=simple_statement
-    { STMT_If {
-        loc=mkLocation $startpos;
-        cond=cond;
-        then_branch=tE;
-        else_branch=None
-    } }
+    { mkIfStmt $startpos cond tE None }
     | IF LPAREN cond=expression RPAREN tE=dangling_if_stmt
-    { STMT_If {
-        loc=mkLocation $startpos;
-        cond=cond;
-        then_branch=tE;
-        else_branch=None
-    } }
+    { mkIfStmt $startpos cond tE None }
     | IF LPAREN cond=expression RPAREN tE=no_dangling_if_stmt ELSE fE=dangling_if_stmt
-    { STMT_If {
-        loc=mkLocation $startpos;
-        cond=cond;
-        then_branch=tE;
-        else_branch=Some fE
-    } }
+    { mkIfStmt $startpos cond tE (Some fE) }
     | WHILE LPAREN cond=expression RPAREN body=dangling_if_stmt
-    { STMT_While {
-        loc=mkLocation $startpos;
-        cond=cond;
-        body=body
-    } }
+    { mkWhileStmt $startpos cond body }
 
 no_dangling_if_stmt:
     | simple_statement { $1 }
     | IF LPAREN cond=expression RPAREN tE=no_dangling_if_stmt ELSE fE=no_dangling_if_stmt
-    { STMT_If {
-        loc=mkLocation $startpos;
-        cond=cond;
-        then_branch=tE;
-        else_branch=Some fE
-    } }
+    { mkIfStmt $startpos cond tE (Some fE) }
     | WHILE LPAREN cond=expression RPAREN body=no_dangling_if_stmt
-    { STMT_While {
-        loc=mkLocation $startpos;
-        cond=cond;
-        body=body
-    } }
+    { mkWhileStmt $startpos cond body }
 
 simple_statement:
     | function_call { STMT_Call $1 }
@@ -264,7 +234,7 @@ exprF:
 
 exprG:
     | exprH { $1 }
-    | unary_op exprH { mkUnaryOp $startpos $1 $2 }
+(*    | unary_op exprH { mkUnaryOp $startpos $1 $2 } *)
 
 exprH:
     | identifier
@@ -285,9 +255,7 @@ exprH:
     | LENGTH LPAREN e=expression RPAREN
     { EXPR_Length { tag=mkTag (); loc=mkLocation $startpos; arg=e } }
 
-    (*
     | function_call { EXPR_Call $1 }
-    *)
 
     (*
     | e=expression LBRACKET index=expression RBRACKET
