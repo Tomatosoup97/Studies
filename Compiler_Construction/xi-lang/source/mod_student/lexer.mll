@@ -15,7 +15,9 @@
 
   let whitespace = [' ' '\t' '\n' '\r']
   let digit = ['0'-'9']
-  let identifier    = ['a'-'z' '_' 'A' - 'Z']['_' 'A' - 'Z' 'a'-'z' '0'-'9']*
+  let alnum = ['_' 'A'-'Z' 'a'-'z' '0'-'9']
+  let rstring = alnum*
+  let identifier = ['a'-'z' '_' 'A' - 'Z'] alnum*
 
   rule token = parse
       | ['\n']
@@ -30,43 +32,42 @@
       | eof
       { EOF }
 
-      | '+'         { PLUS }
-      | '-'         { MINUS }
-      | "*>>"       { HIGH_MULT }
-      | '*'         { MULT }
-      | '/'         { DIV }
-      | '%'         { MOD }
-      | '&'         { BIN_AND }
-      | '|'         { BIN_OR }
-      | '!'         { BIN_NEG }
-      | '('         { LPAREN }
-      | ')'         { RPAREN }
-      | '{'         { LBRACE }
-      | '}'         { RBRACE }
-      (*| "[]"        { ARRAY }*)
-      | '['         { LBRACKET }
-      | ']'         { RBRACKET }
-      | ','         { COMMA }
-      | ':'         { COLON }
-      | ';'         { SEMICOLON }
-      | "=="        { EQ }
-      | "!="        { NEQ }
-      | "<="        { LTE }
-      | '<'         { LT }
-      | ">="        { GTE }
-      | '>'         { GT }
-      | '='         { ASSIGN }
-      | "true"      { BOOL (true) }
-      | "false"     { BOOL (false) }
-      | "length"    { LENGTH }
-      | "int"       { INT_T }
-      | "bool"      { BOOL_T }
-      | "if"        { IF }
-      | "else"      { ELSE }
-      | "while"     { WHILE }
-      | "return"    { RET }
-      | "'"         { APOSTROPHE }
-      | '"'         { QUOT_MARK }
+      | '+'                     { PLUS }
+      | '-'                     { MINUS }
+      | '*'                     { MULT }
+      | '/'                     { DIV }
+      | '%'                     { MOD }
+      | '&'                     { BIN_AND }
+      | '|'                     { BIN_OR }
+      | '!'                     { NEG }
+      | '('                     { LPAREN }
+      | ')'                     { RPAREN }
+      | '{'                     { LBRACE }
+      | '}'                     { RBRACE }
+      | '['                     { LBRACKET }
+      | ']'                     { RBRACKET }
+      | ','                     { COMMA }
+      | ':'                     { COLON }
+      | ';'                     { SEMICOLON }
+      | "=="                    { EQ }
+      | "!="                    { NEQ }
+      | "<="                    { LTE }
+      | '<'                     { LT }
+      | ">="                    { GTE }
+      | '>'                     { GT }
+      | '='                     { ASSIGN }
+      | '_'                     { UNDERSCORE }
+      | "true"                  { BOOL (true) }
+      | "false"                 { BOOL (false) }
+      | "length"                { LENGTH }
+      | "int"                   { INT_T }
+      | "bool"                  { BOOL_T }
+      | "if"                    { IF }
+      | "else"                  { ELSE }
+      | "while"                 { WHILE }
+      | "return"                { RET }
+      | "'" alnum as c "'"      { CHAR (c.[0]) }
+      | '"' rstring as s '"'    { STRING (s) }
 
       | identifier as id
       { IDENTIFIER (id) }
