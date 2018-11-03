@@ -39,7 +39,7 @@
       | '%'                     { MOD }
       | '&'                     { BIN_AND }
       | '|'                     { BIN_OR }
-      | '!'                     { NEG }
+      | '!'                     { NOT }
       | '('                     { LPAREN }
       | ')'                     { RPAREN }
       | '{'                     { LBRACE }

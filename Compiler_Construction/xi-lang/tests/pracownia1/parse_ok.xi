@@ -93,7 +93,7 @@ f()
     while pred() {
         zmienna = wartosc
         return
-    }
+    };
 }
 
 f()
@@ -154,6 +154,12 @@ g()
 
 g()
 {
+    {
+        {}
+        {};
+        {}
+        {};
+    };
     x[0] = 1
     x[0][1] = 2
     x[a][b] = c[d]

@@ -37,6 +37,10 @@ let mkWhileStmt = fun stp -> fun cond -> fun body -> STMT_While {
     body=body
 }
 
+let mkIdExpr = fun stp -> fun id -> EXPR_Id {
+    tag=mkTag (); loc=mkLocation stp; id=id
+}
+
 %}
 
 %token <int32> INT
@@ -53,7 +57,7 @@ let mkWhileStmt = fun stp -> fun cond -> fun body -> STMT_While {
 %token MOD
 %token BIN_AND
 %token BIN_OR
-%token NEG
+%token NOT
 %token ASSIGN
 %token LPAREN
 %token RPAREN
@@ -96,12 +100,11 @@ global_declaration:
     } }
 
 formal_parameters:
-    | LPAREN vds=var_declarations RPAREN
-    { vds }
+    | LPAREN var_declarations RPAREN { $2 }
 
 var_declarations:
     | { [] }
-    | var_declaration { [$1] }
+    | var_declaration   { [$1] }
     | vd=var_declaration COMMA vds=var_declarations { vd :: vds }
 
 var_declaration:
@@ -127,48 +130,51 @@ type_expression:
     | COLON t=type_node { t }
 
 type_node:
-    | INT_T { TEXPR_Int { loc=mkLocation $startpos } }
-    | BOOL_T { TEXPR_Bool { loc=mkLocation $startpos } }
+    | INT_T     { TEXPR_Int { loc=mkLocation $startpos } }
+    | BOOL_T    { TEXPR_Bool { loc=mkLocation $startpos } }
 
 statement_block:
     | LBRACE sts=statement* RBRACE
     { STMTBlock { loc=mkLocation $startpos; body=sts } }
 
-(* TODO: "Each statement in a block may be terminated by a semicolon"
- * Right now every statement can be terminated by a semicolon - not only in a block
- * *)
 statement:
     | dangling_if_stmt SEMICOLON?       { $1 }
     | no_dangling_if_stmt SEMICOLON?    { $1 }
 
 dangling_if_stmt:
-    | IF LPAREN cond=expression RPAREN tE=simple_statement
+    | IF cond=parens_expr tE=simple_statement
     { mkIfStmt $startpos cond tE None }
-    | IF LPAREN cond=expression RPAREN tE=dangling_if_stmt
+    | IF cond=parens_expr tE=dangling_if_stmt
     { mkIfStmt $startpos cond tE None }
-    | IF LPAREN cond=expression RPAREN tE=no_dangling_if_stmt ELSE fE=dangling_if_stmt
+    | IF cond=parens_expr tE=no_dangling_if_stmt ELSE fE=dangling_if_stmt
     { mkIfStmt $startpos cond tE (Some fE) }
-    | WHILE LPAREN cond=expression RPAREN body=dangling_if_stmt
+    | WHILE cond=parens_expr body=dangling_if_stmt
     { mkWhileStmt $startpos cond body }
 
 no_dangling_if_stmt:
     | simple_statement { $1 }
-    | IF LPAREN cond=expression RPAREN tE=no_dangling_if_stmt ELSE fE=no_dangling_if_stmt
+    | IF cond=parens_expr tE=no_dangling_if_stmt ELSE fE=no_dangling_if_stmt
     { mkIfStmt $startpos cond tE (Some fE) }
-    | WHILE LPAREN cond=expression RPAREN body=no_dangling_if_stmt
+    | WHILE cond=parens_expr body=no_dangling_if_stmt
     { mkWhileStmt $startpos cond body }
 
+parens_expr:
+    | expression { $1 }
+    | LPAREN expression RPAREN { $2 }
+
 simple_statement:
-    | function_call { STMT_Call $1 }
-    | vd=var_declaration init=assign_expr?
-    { STMT_VarDecl { var=vd; init=init } }
+    | function_call
+    { STMT_Call $1 }
+    | var_declaration assign_expr?
+    { STMT_VarDecl { var=$1; init=$2 } }
     | lvalue assign_expr
     { STMT_Assign { loc=mkLocation $startpos; lhs=$1; rhs=$2 } }
-(* TODO *)
-(*    | RET exprs=expressions
-    { STMT_Return { loc=mkLocation $startpos; values=exprs } } *)
+    (* TODO: hacking my way through conflicts with semicolon *)
+    | RET exprs=expressions SEMICOLON
+    { STMT_Return { loc=mkLocation $startpos; values=exprs } }
     | multi_var_decl { $1 }
-    | statement_block { STMT_Block $1 }
+    | statement_block
+    { STMT_Block $1 }
 
 function_call:
     | id=identifier LPAREN exprs=expressions RPAREN
@@ -180,23 +186,26 @@ function_call:
     } }
 
 assign_expr:
-    | ASSIGN e=expression  { e }
+    | ASSIGN e=expression { e }
 
 lvalue:
-    | identifier { LVALUE_Id { loc=mkLocation $startpos; id=$1 } }
-    | e=expression LBRACKET index=expression RBRACKET
-    { LVALUE_Index { loc=mkLocation $startpos; sub=e; index=index } }
+    | identifier
+    { LVALUE_Id { loc=mkLocation $startpos; id=$1 } }
+    | array_expr LBRACKET expression RBRACKET
+    { LVALUE_Index { loc=mkLocation $startpos; sub=$1; index=$3 } }
+
+array_expr:
+    | identifier { mkIdExpr $startpos $1 }
+    | e=array_expr LBRACKET index=expression RBRACKET
+    { EXPR_Index { tag=mkTag (); loc=mkLocation $startpos; expr=e; index=index } }
 
 multi_var_decl:
     | vds=nullable_var_declarations ASSIGN call=function_call
     { STMT_MultiVarDecl { loc=mkLocation $startpos; vars=vds; init=call } }
 
-(* TODO: Can i assume that there are at least two of nullable_var_decls?
- * otherwise results in shift/reduce conflict
- * *)
 nullable_var_declarations:
-    | vd1=var_declaration COMMA vd2=var_declaration { [Some vd1; Some vd2] }
-    | UNDERSCORE COMMA vds=nullable_var_declarations { None :: vds }
+    | vd1=var_declaration COMMA vd2=var_declaration     { [Some vd1; Some vd2] }
+    | UNDERSCORE COMMA vds=nullable_var_declarations    { None :: vds }
     | vd=var_declaration COMMA vds=nullable_var_declarations { (Some vd) :: vds }
 
 (* TODO: maybe rename xs -> x_list ? *)
@@ -205,6 +214,7 @@ expressions:
     | expression { [$1] }
     | e=expression COMMA exprs=expressions { e :: exprs }
 
+(* TODO s/exprA/exprG *)
 expression:
     | exprA { $1 }
 
@@ -234,11 +244,11 @@ exprF:
 
 exprG:
     | exprH { $1 }
-(*    | unary_op exprH { mkUnaryOp $startpos $1 $2 } *)
+    | unary_op exprH { mkUnaryOp $startpos $1 $2 }
 
 exprH:
     | identifier
-    { EXPR_Id { tag=mkTag (); loc=mkLocation $startpos; id=$1 } }
+    { mkIdExpr $startpos $1 }
 
     | INT
     { EXPR_Int { tag=mkTag (); loc=mkLocation $startpos; value=$1 } }
@@ -257,16 +267,14 @@ exprH:
 
     | function_call { EXPR_Call $1 }
 
+    (* TODO: conflict here *)
     (*
     | e=expression LBRACKET index=expression RBRACKET
     { EXPR_Index { tag=mkTag (); loc=mkLocation $startpos; expr=e; index=index } }
     *)
 
-    (* TODO: conflict here *)
-    (*
     | LBRACE els=expressions RBRACE
     { EXPR_Struct { tag=mkTag (); loc=mkLocation $startpos; elements=els } }
-    *)
 
 eq_op:
     | EQ        { RELOP_Eq }
@@ -287,10 +295,9 @@ strong_bin_op:
     | DIV       { BINOP_Div }
     | MOD       { BINOP_Rem }
 
-(* Which is NOT and which is NEG ? *)
 unary_op:
-  | NEG         { UNOP_Neg }
-  | MINUS       { UNOP_Not }
+  | NOT         { UNOP_Not } (* ! *)
+  | MINUS       { UNOP_Neg } (* - *)
 
 identifier:
     | IDENTIFIER
