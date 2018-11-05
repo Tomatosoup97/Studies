@@ -4,7 +4,7 @@ f(x:int)
 
 f():int
 {
-    return 0;
+    return 0
 }
 
 f(x:int, y:int)

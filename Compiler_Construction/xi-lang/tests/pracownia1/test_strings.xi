@@ -14,6 +14,8 @@ g()
     z = "abece\nde"
     z = "abece\\de"
     z = "abece\"de"
+
+    s: int[] = "Hello";
 }
 
 //@PRACOWNIA

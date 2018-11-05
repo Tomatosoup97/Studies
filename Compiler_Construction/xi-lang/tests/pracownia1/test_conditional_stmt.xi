@@ -30,6 +30,16 @@ f()
     if x if y z = 1 else z = 2
 }
 
+f()
+{
+    if x if y z = 1 else z = 2 else z = 1
+}
+
+f()
+{
+    if a if x if y z = 1 else z = 2 else z = 1
+}
+
 
 //@PRACOWNIA
 //@stop_after parser

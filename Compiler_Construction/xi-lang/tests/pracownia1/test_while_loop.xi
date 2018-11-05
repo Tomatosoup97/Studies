@@ -8,6 +8,7 @@ f()
         zmienna = wartosc
         return;
     };
+
 }
 
 //@PRACOWNIA
