@@ -90,7 +90,7 @@ file:
     { ModuleDefinition { global_declarations=$1 } }
 
 global_declaration:
-    | identifier formal_parameters type_expressions statement_block?
+    | identifier formal_parameters type_expressions_list statement_block?
     { GDECL_Function {
         loc=mkLocation $startpos;
         id=$1;
@@ -108,34 +108,42 @@ var_declarations:
     | vd=var_declaration COMMA vds=var_declarations { vd :: vds }
 
 var_declaration:
-    | identifier type_expression
+    | identifier COLON type_expression
     { VarDecl {
         loc=mkLocation $startpos;
         id=$1;
-        tp=$2
+        tp=$3
     } }
 
-type_expressions:
+type_expressions_list:
     | { [] }
+    | COLON type_expressions { $2 }
+
+type_expressions:
     | type_expression { [$1] }
     | t=type_expression COMMA ts=type_expressions { t :: ts }
 
 type_expression:
-    | COLON t=type_node LBRACKET dim=expression? RBRACKET
+    | type_node { $1 }
+    | type_node LBRACKET expression? RBRACKET
     { TEXPR_Array {
             loc=mkLocation $startpos;
-            sub=t;
-            dim=dim
+            sub=$1;
+            dim=$3
     } }
-    | COLON t=type_node { t }
 
-type_node:
+%inline type_node:
     | INT_T     { TEXPR_Int { loc=mkLocation $startpos } }
     | BOOL_T    { TEXPR_Bool { loc=mkLocation $startpos } }
 
 statement_block:
-    | LBRACE sts=statement* RBRACE
+    | LBRACE sts=statements_list RBRACE
     { STMTBlock { loc=mkLocation $startpos; body=sts } }
+
+statements_list:
+    |                                   { [] }
+    | return_statement                  { [$1] }
+    | st=statement sts=statements_list  { st :: sts }
 
 statement:
     | dangling_if_stmt SEMICOLON?       { $1 }
@@ -158,7 +166,7 @@ no_dangling_if_stmt:
     | WHILE cond=parens_expr body=no_dangling_if_stmt
     { mkWhileStmt $startpos cond body }
 
-parens_expr:
+%inline parens_expr:
     | expression { $1 }
     | LPAREN expression RPAREN { $2 }
 
@@ -169,12 +177,13 @@ simple_statement:
     { STMT_VarDecl { var=$1; init=$2 } }
     | lvalue assign_expr
     { STMT_Assign { loc=mkLocation $startpos; lhs=$1; rhs=$2 } }
-    (* TODO: hacking my way through conflicts with semicolon *)
-    | RET exprs=expressions SEMICOLON
-    { STMT_Return { loc=mkLocation $startpos; values=exprs } }
     | multi_var_decl { $1 }
     | statement_block
     { STMT_Block $1 }
+
+%inline return_statement:
+    | RET exprs=expressions
+    { STMT_Return { loc=mkLocation $startpos; values=exprs } }
 
 function_call:
     | id=identifier LPAREN exprs=expressions RPAREN
@@ -185,7 +194,7 @@ function_call:
         arguments=exprs
     } }
 
-assign_expr:
+%inline assign_expr:
     | ASSIGN e=expression { e }
 
 lvalue:
@@ -204,9 +213,12 @@ multi_var_decl:
     { STMT_MultiVarDecl { loc=mkLocation $startpos; vars=vds; init=call } }
 
 nullable_var_declarations:
-    | vd1=var_declaration COMMA vd2=var_declaration     { [Some vd1; Some vd2] }
-    | UNDERSCORE COMMA vds=nullable_var_declarations    { None :: vds }
-    | vd=var_declaration COMMA vds=nullable_var_declarations { (Some vd) :: vds }
+    | maybe_var_decl COMMA maybe_var_decl     { [$1; $3] }
+    | vd=maybe_var_decl COMMA vds=nullable_var_declarations { vd :: vds }
+
+maybe_var_decl:
+    | UNDERSCORE    { None }
+    | var_declaration { Some $1 }
 
 (* TODO: maybe rename xs -> x_list ? *)
 expressions:
@@ -267,11 +279,8 @@ exprH:
 
     | function_call { EXPR_Call $1 }
 
-    (* TODO: conflict here *)
-    (*
-    | e=expression LBRACKET index=expression RBRACKET
+    | e=exprH LBRACKET index=expression RBRACKET
     { EXPR_Index { tag=mkTag (); loc=mkLocation $startpos; expr=e; index=index } }
-    *)
 
     | LBRACE els=expressions RBRACE
     { EXPR_Struct { tag=mkTag (); loc=mkLocation $startpos; elements=els } }

@@ -10,5 +10,16 @@ test()
 
 }
 
+f()
+{
+    x = 1 + 2 + 3
+    x = 1 - 2 - 3
+    x = 1 * 2 * 3
+    x = 1 / 2 / 3
+    x = 1 % 2 % 3
+    x = 1 & 2 & 3
+    x = 1 | 2 | 3
+}
+
 //@PRACOWNIA
 //@stop_after parser
