@@ -13,7 +13,7 @@
 
   }
 
-  let whitespace = [' ' '\t' '\n' '\r']
+  let whitespace = [' ' '\t']
   let digit = ['0'-'9']
   let alnum = ['_' 'A'-'Z' 'a'-'z' '0'-'9']
   let rstring = alnum*
@@ -66,8 +66,8 @@
       | "else"                  { ELSE }
       | "while"                 { WHILE }
       | "return"                { RET }
-      | "'" alnum as c "'"      { CHAR (c.[0]) }
-      | '"' rstring as s '"'    { STRING (s) }
+      | "'"                     { esc_char lexbuf }
+      | "\""                    { esc_string "" lexbuf }
 
       | identifier as id
       { IDENTIFIER (id) }
@@ -87,4 +87,23 @@
 
       | _
       { line_comment lexbuf }
+
+  and esc_string buf = parse
+      | '\n'                { handleError (Lexing.lexeme_start_p lexbuf) (Lexing.lexeme lexbuf) }
+      | "\\n"               { esc_string (buf ^ "\n") lexbuf }
+      | "\\t"               { esc_string (buf ^ "\t") lexbuf }
+      | "\\'"               { esc_string (buf ^ "\'") lexbuf }
+      | "\\\""              { esc_string (buf ^ "\"") lexbuf }
+      | "\\\\"              { esc_string (buf ^ "\\") lexbuf }
+      | "\""                { STRING (buf) }
+      | _ as c              { esc_string (buf ^ (String.make 1 c)) lexbuf }
+  and esc_char = parse
+      | "\\n"               { ret_char '\n' lexbuf }
+      | "\\\'"              { ret_char '\'' lexbuf }
+      | "\\\\"              { ret_char '\\' lexbuf }
+      | ['\'' '\\' '\n']    { handleError (Lexing.lexeme_start_p lexbuf) (Lexing.lexeme lexbuf) }
+      | _ as c              { ret_char c lexbuf }
+  and ret_char buf = parse
+      | '\''                { CHAR buf }
+      | _ as c              { handleError (Lexing.lexeme_start_p lexbuf) (Lexing.lexeme lexbuf) }
 

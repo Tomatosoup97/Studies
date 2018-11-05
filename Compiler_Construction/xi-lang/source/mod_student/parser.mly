@@ -117,7 +117,7 @@ var_declaration:
 
 type_expressions_list:
     | { [] }
-    | COLON type_expressions { $2 }
+    | COLON ts=type_expressions { ts }
 
 type_expressions:
     | type_expression { [$1] }
@@ -125,14 +125,14 @@ type_expressions:
 
 type_expression:
     | type_node { $1 }
-    | type_node LBRACKET expression? RBRACKET
+    | type_expression LBRACKET expression? RBRACKET
     { TEXPR_Array {
             loc=mkLocation $startpos;
             sub=$1;
             dim=$3
     } }
 
-%inline type_node:
+type_node:
     | INT_T     { TEXPR_Int { loc=mkLocation $startpos } }
     | BOOL_T    { TEXPR_Bool { loc=mkLocation $startpos } }
 
@@ -142,29 +142,22 @@ statement_block:
 
 statements_list:
     |                                   { [] }
-    | return_statement                  { [$1] }
-    | st=statement sts=statements_list  { st :: sts }
+    | return_statement SEMICOLON?       { [$1] }
+    | st=statement SEMICOLON? sts=statements_list  { st :: sts }
 
 statement:
-    | dangling_if_stmt SEMICOLON?       { $1 }
-    | no_dangling_if_stmt SEMICOLON?    { $1 }
-
-dangling_if_stmt:
-    | IF cond=parens_expr tE=simple_statement
+    | IF cond=expression tE=statement
     { mkIfStmt $startpos cond tE None }
-    | IF cond=parens_expr tE=dangling_if_stmt
-    { mkIfStmt $startpos cond tE None }
-    | IF cond=parens_expr tE=no_dangling_if_stmt ELSE fE=dangling_if_stmt
+    | IF cond=expression tE=stmt2 ELSE fE=statement
     { mkIfStmt $startpos cond tE (Some fE) }
-    | WHILE cond=parens_expr body=dangling_if_stmt
+    | WHILE cond=expression body=statement
     { mkWhileStmt $startpos cond body }
-
-no_dangling_if_stmt:
     | simple_statement { $1 }
-    | IF cond=parens_expr tE=no_dangling_if_stmt ELSE fE=no_dangling_if_stmt
+
+stmt2:
+    | simple_statement { $1 }
+    | IF cond=expression tE=stmt2 ELSE fE=stmt2
     { mkIfStmt $startpos cond tE (Some fE) }
-    | WHILE cond=parens_expr body=no_dangling_if_stmt
-    { mkWhileStmt $startpos cond body }
 
 %inline parens_expr:
     | expression { $1 }
@@ -217,42 +210,40 @@ nullable_var_declarations:
     | vd=maybe_var_decl COMMA vds=nullable_var_declarations { vd :: vds }
 
 maybe_var_decl:
-    | UNDERSCORE    { None }
-    | var_declaration { Some $1 }
+    | UNDERSCORE        { None }
+    | var_declaration   { Some $1 }
 
-(* TODO: maybe rename xs -> x_list ? *)
 expressions:
     | { [] }
     | expression { [$1] }
     | e=expression COMMA exprs=expressions { e :: exprs }
 
-(* TODO s/exprA/exprG *)
 expression:
     | exprA { $1 }
 
 exprA:
     | exprB { $1 }
-    | exprB BIN_OR exprA { mkBinOp $startpos BINOP_Or $1 $3 }
+    | e1=exprA BIN_OR e2=exprB { mkBinOp $startpos BINOP_Or e1 e2 }
 
 exprB:
     | exprC { $1 }
-    | exprC BIN_AND exprB { mkBinOp $startpos BINOP_And $1 $3 }
+    | e1=exprB BIN_AND e2=exprC { mkBinOp $startpos BINOP_And e1 e2 }
 
 exprC:
     | exprD { $1 }
-    | exprD eq_op exprC { mkRelOp $startpos $2 $1 $3 }
+    | exprC eq_op exprD { mkRelOp $startpos $2 $1 $3 }
 
 exprD:
     | exprE { $1 }
-    | exprE comparison_op exprD { mkRelOp $startpos $2 $1 $3 }
+    | e1=exprD op=comparison_op e2=exprE { mkRelOp $startpos op e1 e2 }
 
 exprE:
     | exprF { $1 }
-    | exprF weak_bin_op exprE { mkBinOp $startpos $2 $1 $3 }
+    | e1=exprE op=weak_bin_op e2=exprF { mkBinOp $startpos op e1 e2 }
 
 exprF:
     | exprG { $1 }
-    | exprG strong_bin_op exprF { mkBinOp $startpos $2 $1 $3 }
+    | e1=exprF op=strong_bin_op e2=exprG { mkBinOp $startpos op e1 e2 }
 
 exprG:
     | exprH { $1 }
@@ -284,6 +275,8 @@ exprH:
 
     | LBRACE els=expressions RBRACE
     { EXPR_Struct { tag=mkTag (); loc=mkLocation $startpos; elements=els } }
+
+    | LPAREN e=expression RPAREN { e }
 
 eq_op:
     | EQ        { RELOP_Eq }
