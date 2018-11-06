@@ -97,12 +97,14 @@
       | "\\\\"              { esc_string (buf ^ "\\") lexbuf }
       | "\""                { STRING (buf) }
       | _ as c              { esc_string (buf ^ (String.make 1 c)) lexbuf }
+
   and esc_char = parse
       | "\\n"               { ret_char '\n' lexbuf }
       | "\\\'"              { ret_char '\'' lexbuf }
       | "\\\\"              { ret_char '\\' lexbuf }
       | ['\'' '\\' '\n']    { handleError (Lexing.lexeme_start_p lexbuf) (Lexing.lexeme lexbuf) }
       | _ as c              { ret_char c lexbuf }
+
   and ret_char buf = parse
       | '\''                { CHAR buf }
       | _ as c              { handleError (Lexing.lexeme_start_p lexbuf) (Lexing.lexeme lexbuf) }
