@@ -11,15 +11,14 @@ https://github.com/Tomatosoup97/ApplicationSecurity
 
 - [Programming language implementation in Haskell](./Metody_Programowania/Solutions/Haskell/Interpreter)
 
+- [Xi-Language compiler in Ocaml](./Compiler_Construction/xi-lang)
+
 - [SAT (SATISFIABILITY) solving machine](./Metody_Programowania/Solutions/Prolog/SAT-solver/main.pl)
 
 - [Propositional calculus proofs by resolution](./Metody_Programowania/Solutions/Prolog/Resolution/main.pl)
 
 - [HDML language parser](./Metody_Programowania/Solutions/Prolog/HDMLParser/main.pl)
     - language for verifying digital circuits (Verilog alike)
-
-- [Xi-Language compiler in Ocaml](./Compiler_Construction/xi-lang)
-
 
 ### Operating systems & Computer Architecture
 
