@@ -27,9 +27,10 @@ module Plugin : PLUGIN = struct
 
   let make_spill_costs_analysis = None
 
+  (* Set to None to use built-in lexer and parser *)
   let lexer_and_parser = Some (module LexerAndParser : LEXER_AND_PARSER)
 
-  let make_typechecker = None
+  let make_typechecker = Some (module Typechecker.Make : MAKE_TYPECHECKER)
 
   let make_translator = None
 
@@ -59,4 +60,3 @@ module Plugin : PLUGIN = struct
 end
 
 module RegisterMyPlugin = RegisterPlugin(Plugin)
-

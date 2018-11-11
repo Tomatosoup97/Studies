@@ -31,9 +31,20 @@ module Make(Steps:COMPILER_STEPS)(Params:PARAMS) = struct
     Logger.dump_string "regmapping" @@ describe_register_mapping mapping
 
   let dump_schedule proc_ir schedule = 
-    let title = Format.sprintf "%s.schedule" (Ir_utils.string_of_procid @@ Ir.procid_of_procedure proc_ir) in
+    let title = Format.sprintf "%s.schedule" (Ir_utils.string_of_procid proc_ir) in
     let output = Ir_utils.string_of_labellist schedule in
     Logger.dump_string title output
+
+  let dump_node2type node2type =
+    let title = "types" in 
+    let f k v xs =
+      let line = Format.sprintf "%s -> %s"
+        (Ast.string_of_node_tag k)
+        (Types.string_of_normal_type v) in
+      line :: xs
+    in
+    let lines = Hashtbl.fold f node2type [] in
+    Logger.dump_string title @@ String.concat "\n" @@ List.sort compare lines
 
   module IrPhases = struct
 
@@ -111,6 +122,7 @@ module Make(Steps:COMPILER_STEPS)(Params:PARAMS) = struct
       List.iter prerr_endline xs;
       Error "typechecker"
     | Ok (node2type) ->
+      dump_node2type node2type;
       if Invariants.AllExpressionsAreTypecheck.verify_module_definition node2type ast then
         check_stop_point "typechecker" translate (ast, node2type)
       else

@@ -72,7 +72,7 @@ module CommandLine = struct
 
   let cmd =
     let doc = "Compile Xi Program" in
-    let version = "pracownia1.1-0-gc10b4f2" in
+    let version = "pracownia2.1-0-g820ab57" in
     Term.(const compile $ xi_log $ extra_debug $ mod_uwr $ plugin $ reg_descr $ stop_after $ output $ source_file),
     Term.info "xi" ~doc ~version
 

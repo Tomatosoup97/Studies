@@ -1,7 +1,7 @@
 
 type node2type = (Ast.node_tag, Types.normal_type) Hashtbl.t
 
-type schedule = (Ir.procedure, Ir.label list) Hashtbl.t
+type schedule = (Ir.procid, Ir.label list) Hashtbl.t
 
 type register_mapping = (Ir.reg, Ir.reg) Hashtbl.t
 
