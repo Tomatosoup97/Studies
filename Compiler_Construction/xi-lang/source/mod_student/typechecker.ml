@@ -1,30 +1,25 @@
+(* vim: set softtabstop=2 sw=2: *)
 open Xi_lib
 open Ast
-(* W Xi_lib.Types są definicje typów i środowiska typowego *)
 open Types
 
 module Make() = struct
 
-  (* Logger: używa się go jak Format.printf *)
+  (* Logger - usage same as Format.printf *)
   let logf fmt = Logger.make_logf __MODULE__ fmt
 
   module Check () = struct
 
-    (* Zgłaszaczka błędów *)
     module ErrorReporter = Typechecker_errors.MakeOneShotErrorReporter ()
 
-    (* Hashtablica którą zwracamy jak wszystko jest OK.
-     * Mapuje znacznik węzła na przypisany typ. Dzięki tej tablicy
-     * późniejsze etapy kompilatora będą miały dostęp do policzonych
-     * typów wyrażeń 
-     * 
-     * Jeżeli typowanie się powiedzie to zawartość tablicy wydrukuje się
-     * do pliku xilog/004.typechecking.types
-     *)
+    (* Symbol table *)
     let node2type_map = Hashtbl.create 513
 
     (* --------------------------------------------------- *)
-    (* Funkcja nakładka na inferencję, jej zadanie to uzupełniać hashtablicę node2type_map *)
+    (* helper functions *)
+
+    (* --------------------------------------------------- *)
+    (* _infer_expression wrapper filling node2type_map hashtable *)
     let rec infer_expression env e =
       let tp = _infer_expression env e in
       Hashtbl.replace node2type_map (tag_of_expression e) tp;
@@ -35,81 +30,145 @@ module Make() = struct
       tp
 
     (* --------------------------------------------------- *)
-    (* Oddolna strategia *)
+    (* Bottom-up strategy *)
     and _infer_expression env = function
       | EXPR_Id {id; loc; _} ->
-        failwith "Not yet implemented"
+          (match TypingEnvironment.lookup id env with
+            | Some (ENVTP_Var t) -> t
+            | Some _ ->
+                ErrorReporter.report_identifier_is_not_variable ~loc ~id
+            | None ->
+                ErrorReporter.report_unknown_identifier ~loc ~id
+          )
 
-      | EXPR_Int _ ->
-        TP_Int
+      | EXPR_Int _ -> TP_Int
 
-      | EXPR_Char _ ->
-        failwith "Not yet implemented"
+      | EXPR_Char _ -> TP_Int
 
-      | EXPR_Bool _ ->
-        failwith "Not yet implemented"
+      | EXPR_Bool _ -> TP_Bool
 
       | EXPR_Index {expr;index;loc; _} ->
-        failwith "Not yet implemented"
+          check_expression env TP_Int index;
+          (match infer_expression env expr with
+            | (TP_Array t) -> t
+            | _ as t -> ErrorReporter.report_expected_array ~loc ~actual:t
+          )
 
       | EXPR_Call call ->
-        check_function_call env call
+          check_function_call env call
 
       | EXPR_Length {arg;loc;_} ->
-        failwith "Not yet implemented"
+          (match infer_expression env arg with
+            | TP_Array _ -> TP_Int
+            | _ as actual -> ErrorReporter.report_expected_array ~loc ~actual
+          )
 
-      | EXPR_Relation {lhs; rhs; op=RELOP_Ge; _} 
-      | EXPR_Relation {lhs; rhs; op=RELOP_Gt; _} 
-      | EXPR_Relation {lhs; rhs; op=RELOP_Lt; _} 
+      | EXPR_Relation {lhs; rhs; op=RELOP_Ge; _}
+      | EXPR_Relation {lhs; rhs; op=RELOP_Gt; _}
+      | EXPR_Relation {lhs; rhs; op=RELOP_Lt; _}
       | EXPR_Relation {lhs; rhs; op=RELOP_Le; _}  ->
-        failwith "Not yet implemented"
+          let t = TP_Int in
+          check_expression env t lhs;
+          check_expression env t rhs;
+          TP_Bool
 
-      | EXPR_Relation {lhs; rhs; op=RELOP_Eq; _} 
+      | EXPR_Relation {lhs; rhs; op=RELOP_Eq; _}
       | EXPR_Relation {lhs; rhs; op=RELOP_Ne; _} ->
-        failwith "Not yet implemented"
+          let lhs_type = infer_expression env lhs in
+          check_expression env lhs_type rhs;
+          TP_Bool
 
-        (* Reguła dla dodawania, jak w treści zadania *)
       | EXPR_Binop {loc; lhs; rhs; op=BINOP_Add; _} ->
-        begin match infer_expression env lhs with
-        | (TP_Array _) as tp
-        | (TP_Int as tp) ->
-          check_expression env tp rhs;
-          tp
-        | _ ->
-          let descr = "operator + expects integer or array" in
-         ErrorReporter.report_other_error ~loc ~descr
-        end
+        (match infer_expression env lhs with
+          | (TP_Array _) as tp
+          | (TP_Int as tp) ->
+            check_expression env tp rhs;
+            tp
+          | _ ->
+            let descr = "operator + expects integer or array" in
+            ErrorReporter.report_other_error ~loc ~descr
+        )
 
-      | EXPR_Binop {lhs; rhs; op=BINOP_And;_} 
-      | EXPR_Binop {lhs; rhs; op=BINOP_Or; _} ->
-        failwith "not yet implemented"
+      | EXPR_Binop {lhs; rhs; op=BINOP_And;_}
+      | EXPR_Binop {lhs; rhs; op=BINOP_Or;_} ->
+          let t = TP_Bool in
+          check_expression env t lhs;
+          check_expression env t rhs;
+          t
 
-      | EXPR_Binop {lhs; rhs; op=BINOP_Sub;_} 
-      | EXPR_Binop {lhs; rhs; op=BINOP_Rem;_} 
-      | EXPR_Binop {lhs; rhs; op=BINOP_Mult;_} 
-      | EXPR_Binop {lhs; rhs; op=BINOP_Div; _} ->
-        failwith "not yet implemented"
+      | EXPR_Binop {lhs; rhs; op=BINOP_Sub;_}
+      | EXPR_Binop {lhs; rhs; op=BINOP_Rem;_}
+      | EXPR_Binop {lhs; rhs; op=BINOP_Mult;_}
+      | EXPR_Binop {lhs; rhs; op=BINOP_Div;_} ->
+          let t = TP_Int in
+          check_expression env t lhs;
+          check_expression env t rhs;
+          t
 
       | EXPR_Unop {op=UNOP_Neg; sub; _} ->
-        failwith "not yet implemented"
+          check_expression env TP_Bool sub;
+          TP_Bool
 
       | EXPR_Unop {op=UNOP_Not; sub; _} ->
-        failwith "not yet implemented"
+          check_expression env TP_Bool sub;
+          TP_Bool
 
       | EXPR_String _ ->
-        failwith "not yet implemented"
+          TP_Array TP_Int
 
       | EXPR_Struct {elements=[]; loc; _} ->
-        ErrorReporter.report_cannot_infer ~loc
+          ErrorReporter.report_cannot_infer ~loc
 
       | EXPR_Struct {elements=x::xs; _} ->
-        failwith "not yet implemented"
+          let t = infer_expression env x in
+          List.iter (check_expression env t) xs;
+          TP_Array t
 
-    and check_function_call env call = 
-      failwith "not yet implemented"
+    and infer_var_decl env (VarDecl {loc; id; tp}) =
+        let t = infer_type_expr env tp in
+        let ext_env, is_new = TypingEnvironment.add id (ENVTP_Var t) env in
+        if is_new then t, ext_env
+                  else ErrorReporter.report_shadows_previous_definition ~loc ~id
+
+    and infer_type_exprs env = List.map (infer_type_expr env)
+
+    and infer_type_expr env = function
+      | TEXPR_Int _ -> TP_Int
+      | TEXPR_Bool _ -> TP_Bool
+      | TEXPR_Array {dim; sub; _} ->
+          (match dim with
+            | Some dim ->
+                check_expression env TP_Int dim;
+                TP_Array (infer_type_expr env sub)
+            | None ->
+                TP_Array (infer_type_expr env sub)
+          )
+
+    and check_function_args env loc formal_params actual_params =
+      let check = fun arg -> fun t -> check_expression env t arg in
+      let expected = List.length formal_params in
+      let actual = List.length actual_params in
+      if expected <> actual then
+        ErrorReporter.report_bad_number_of_arguments  ~loc ~actual ~expected
+      else List.iter2 check actual_params formal_params
+
+    and check_function_call env (Call { loc ; callee; arguments; _}) =
+        (match TypingEnvironment.lookup callee env with
+          | Some (ENVTP_Fn (param_ts, [res_t])) ->
+              check_function_args env loc param_ts arguments;
+              let check = fun arg -> fun t -> check_expression env t arg in
+              List.iter2 check arguments param_ts;
+              res_t
+          | Some (ENVTP_Fn (_, t::ts)) ->
+              ErrorReporter.report_expected_function_returning_one_value  ~loc ~id:callee
+          | Some _ ->
+              ErrorReporter.report_identifier_is_not_callable ~loc ~id:callee
+          | None ->
+              ErrorReporter.report_unknown_identifier ~loc ~id:callee
+        )
 
     (* --------------------------------------------------- *)
-    (* Odgórna strategia: zapish w node2type_map oczekiwanie a następnie
+    (* Top-down strategy: zapisz w node2type_map oczekiwanie a następnie
      * sprawdź czy nie zachodzi specjalny przypadek. *)
     and check_expression env expected e =
       logf "%s: checking expression against %s"
@@ -117,16 +176,11 @@ module Make() = struct
         (string_of_normal_type expected);
       Hashtbl.replace node2type_map (tag_of_expression e) expected;
 
-      (* Sprawdzamy specjalne przypadki *)
       match e, expected with
-          (* Mamy sprawdzić `{elements...}` kontra `tp[]`, czyli sprawdzamy 
-          * elementy kontra typ elementu tablicy `tp` *)
       | EXPR_Struct {elements; _}, TP_Array tp ->
         List.iter (check_expression env tp) elements
 
-      (* ========== !! Zaimplementuj pozostale przypadki !! =========  *)
-
-      (* Fallback do strategii oddolnej *)
+      (* Bottom-up strategy fallback *)
       | _ ->
         let actual = infer_expression env e in
         if actual <> expected then
@@ -136,34 +190,91 @@ module Make() = struct
             ~expected
 
     (* --------------------------------------------------- *)
-    (* Pomocnicza funkcja do sprawdzania wywołania procedury *)
+    (* Procedure checking helper function *)
 
-    let check_procedure_call env call : unit = 
-      failwith "not yet implemented"
+    let check_procedure_call env (Call { loc ; callee; arguments; _}) : unit =
+      (match TypingEnvironment.lookup callee env with
+        | Some (ENVTP_Fn (param_ts, [])) ->
+            check_function_args env loc param_ts arguments;
+            ()
+        | Some (ENVTP_Fn (_, ts)) ->
+            ErrorReporter.report_procedure_cannot_return_value ~loc
+        | Some _ ->
+            ErrorReporter.report_identifier_is_not_callable ~loc ~id:callee
+        | None ->
+            ErrorReporter.report_unknown_identifier ~loc ~id:callee
+      )
+
+    let check_multi_ret_call env (Call { loc ; callee; arguments; _}) =
+      (match TypingEnvironment.lookup callee env with
+        | Some (ENVTP_Fn (_, [])) ->
+            ErrorReporter.report_expected_function_returning_many_values
+            ~loc ~id:callee ~expected:42 ~actual:0 (* TODO: expected *)
+        | Some (ENVTP_Fn (_, [t])) ->
+            ErrorReporter.report_expected_function_returning_many_values
+            ~loc ~id:callee ~expected:42 ~actual:1 (* TODO: expected *)
+        | Some (ENVTP_Fn (param_ts, ret_ts)) ->
+            check_function_args env loc param_ts arguments;
+            callee, ret_ts
+        | Some _ ->
+            ErrorReporter.report_identifier_is_not_callable ~loc ~id:callee
+        | None ->
+            ErrorReporter.report_unknown_identifier ~loc ~id:callee
+      )
 
     (* --------------------------------------------------- *)
-    (* Rekonstrukcja typu dla lvalue *)
+    (* Left-value *)
 
     let infer_lvalue env = function
-      | LVALUE_Id {id;loc;_} -> 
-        failwith "not yet implemented"
-
+      | LVALUE_Id {id;loc;_} ->
+          (* TODO: this basically duplicates EXPR_Id *)
+          (match TypingEnvironment.lookup id env with
+            | Some (ENVTP_Var t) -> t
+            | Some _ ->
+                ErrorReporter.report_identifier_is_not_variable ~loc ~id
+            | None ->
+                ErrorReporter.report_unknown_identifier ~loc ~id
+          )
       | LVALUE_Index {index; sub; loc} ->
-        failwith "not yet implemented"
-
+          check_expression env TP_Int index;
+          (match infer_expression env sub with
+            | (TP_Array t) -> t
+            | _ as t -> ErrorReporter.report_expected_array ~loc ~actual:t
+          )
 
     (* --------------------------------------------------- *)
-    (* Sprawdzanie statementów *)
+    (* Statements *)
 
     let rec check_statement env = function
-      (* Proste, wyinferuj typ `lhs` i sprawdź `rhs` kontra wynik *)
       | STMT_Assign {lhs; rhs; _} ->
         let lhs_tp = infer_lvalue env lhs in
         check_expression env lhs_tp rhs;
         env, RT_Unit
 
-      | STMT_MultiVarDecl {vars; init; _} ->
-        failwith "not yet implemented"
+      | STMT_MultiVarDecl {vars; init; loc} ->
+          let callee, ret_ts = check_multi_ret_call env init in
+          let _var_decl_foldr = fun vd -> fun (ts, env) ->
+            (match vd with
+              | Some vd -> let t, ext_env = infer_var_decl env vd in
+                           (Some t) :: ts, ext_env
+              | None -> None :: ts, env
+            )
+          in let inf_ts, ext_env = List.fold_right _var_decl_foldr vars ([], env) in
+          let check_type = fun ret_t -> fun inf_t ->
+            (match inf_t with
+              | Some inf_t ->
+                if ret_t <> inf_t then ErrorReporter.report_type_mismatch
+                                       ~loc ~actual:inf_t ~expected:ret_t
+              | None -> ()
+            )
+          in let expected = List.length ret_ts in
+          let actual = List.length inf_ts in
+          if expected <> actual then
+            ErrorReporter.report_expected_function_returning_many_values
+              ~loc ~id:callee ~actual ~expected
+          else List.iter2 check_type ret_ts inf_ts;
+          ext_env, RT_Unit
+
 
       | STMT_Block body ->
         check_statement_block env body
@@ -173,32 +284,83 @@ module Make() = struct
         env, RT_Unit
 
       | STMT_If {cond;then_branch;else_branch; _} ->
-        failwith "not yet implemented"
+          check_expression env TP_Bool cond;
+          let _, t_res = check_statement env then_branch in
+          (match else_branch with
+            | Some else_branch ->
+                let _, f_res = check_statement env else_branch in
+                env, if t_res == f_res then t_res else RT_Unit
+            | None -> env, RT_Unit
+          )
 
       | STMT_Return {values;loc} ->
-        failwith "not yet implemented"
+          (* TODO: just infering is fine? *)
+          let _ = List.map (infer_expression env) values in
+          env, RT_Void
 
       | STMT_VarDecl {var; init} ->
-        failwith "not yet implemented"
+          let t, ext_env = infer_var_decl env var in
+          (match init with
+            | Some e -> check_expression env t e;
+            | None -> ());
+          ext_env, RT_Unit
 
-      | STMT_While {cond; body; _} ->
-        failwith "not yet implemented"
+      | STMT_While {cond; body; loc} ->
+          check_expression env TP_Bool cond;
+          let _, _  = check_statement env body in
+          env, RT_Unit
 
     and check_statement_block env (STMTBlock {body; _}) =
-        failwith "not yet implemented"
+          check_statement_block_aux env body
+
+    and check_statement_block_aux env = function
+          | [] -> env, RT_Unit
+          | [s] -> check_statement env s
+          | s :: ss ->
+              let newEnv, s_res = check_statement env s in
+              let loc = (location_of_statement s) in
+              (match s_res with
+                | RT_Unit -> check_statement_block_aux newEnv ss
+                (* TODO: think about more verbose error *)
+                | _ -> ErrorReporter.report_cannot_infer ~loc
+              )
 
     (* --------------------------------------------------- *)
-    (* Top-level funkcje *)
+    (* Top-level functions *)
+
+    let infer_formal_params env formal_parameters =
+      let _var_decl_foldr = fun vd -> fun (ts, env) ->
+        let t, ext_env = infer_var_decl env vd in
+        t :: ts, ext_env
+      in List.fold_right _var_decl_foldr formal_parameters ([], env)
 
     let check_global_declaration env = function
       | GDECL_Function {formal_parameters; return_types; body; loc; id; _} ->
-        (* Sprawdź wszystko *)
-        failwith "not yet implemented"
+          let _, ext_env = infer_formal_params env formal_parameters in
+          (match TypingEnvironment.lookup_unsafe id env with
+            | ENVTP_Fn (_, ret_types) ->
+              (match body with
+                | Some body ->
+                  (match check_statement_block ext_env body with
+                    | _, RT_Void -> ()
+                    | _, RT_Unit ->
+                        if List.length ret_types <> 0 then
+                         ErrorReporter.report_not_all_control_paths_return_value ~loc ~id
+                        else ()
+                  )
+                | None -> ()
+              )
+            | _ -> ErrorReporter.report_identifier_is_not_callable ~loc ~id
+          )
 
     let scan_global_declaration env = function
       | GDECL_Function {id; formal_parameters; return_types; loc; _} ->
-        (* Dodaj idenetyfkator funkcji i jej typ do środowiska *)
-        failwith "not yet implemented"
+          let param_types, _ = infer_formal_params env formal_parameters in
+          let infered_rtypes = infer_type_exprs env return_types in
+          let func_type = ENVTP_Fn (param_types, infered_rtypes) in
+          let ext_env, is_new = TypingEnvironment.add id func_type env in
+          if is_new then ext_env
+                    else ErrorReporter.report_shadows_previous_definition ~loc ~id
 
     let scan_module env (ModuleDefinition {global_declarations; _}) =
       List.fold_left scan_global_declaration env global_declarations
@@ -207,25 +369,23 @@ module Make() = struct
       List.iter (check_global_declaration env) global_declarations
 
     (* --------------------------------------------------- *)
-    (* Przetwórz moduł *)
     let process_module env mdef =
-      (* Wpierw przeskanuj globalne definicje aby uzupełnić środowisko *)
+      (* Scan module to gather global declarations *)
       let env = scan_module env mdef in
-      (* Zweryfikuj wszystko *)
+      (* Verify global declarations *)
       check_module env mdef
 
-    let computation mdef = 
-      (* Zaczynamy z pustym środowiskiem *)
+    let computation mdef =
       let env = TypingEnvironment.empty in
       process_module env mdef;
       node2type_map
   end
 
   (* --------------------------------------------------- *)
-  (* Procedura wejściowa *)
+  (* Entrypoint *)
   let check_module mdef =
-    (* Stwórz instancję typecheckera i ją odpal *)
+    (* Create and run typechecker instance *)
     let module M = Check() in
-    M.ErrorReporter.wrap M.computation mdef 
+    M.ErrorReporter.wrap M.computation mdef
 
 end
