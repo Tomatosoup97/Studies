@@ -130,18 +130,37 @@ module Make() = struct
         if is_new then t, ext_env
                   else ErrorReporter.report_shadows_previous_definition ~loc ~id
 
+    and infer_var_decl_dim env (VarDecl {loc; id; tp}) =
+        (* TODO: This duplicates the code above! *)
+        let has_dim, t = infer_type_expr_dim env tp in
+        let ext_env, is_new = TypingEnvironment.add id (ENVTP_Var t) env in
+        if is_new then loc, has_dim, t, ext_env
+                  else ErrorReporter.report_shadows_previous_definition ~loc ~id
+
     and infer_type_exprs env = List.map (infer_type_expr env)
 
     and infer_type_expr env = function
       | TEXPR_Int _ -> TP_Int
       | TEXPR_Bool _ -> TP_Bool
+      | TEXPR_Array {dim; sub; loc} ->
+          (match dim with
+            | Some dim ->
+                ErrorReporter.report_array_initialization_forbidden ~loc
+            | None ->
+                TP_Array (infer_type_expr env sub)
+          )
+
+    and infer_type_expr_dim env = function
+      (* TODO: This duplicates the code above *)
+      | TEXPR_Int _ -> false, TP_Int
+      | TEXPR_Bool _ -> false, TP_Bool
       | TEXPR_Array {dim; sub; _} ->
           (match dim with
             | Some dim ->
                 check_expression env TP_Int dim;
-                TP_Array (infer_type_expr env sub)
+                true, TP_Array (infer_type_expr env sub)
             | None ->
-                TP_Array (infer_type_expr env sub)
+                false, TP_Array (infer_type_expr env sub)
           )
 
     and check_function_args env loc formal_params actual_params =
@@ -252,6 +271,7 @@ module Make() = struct
         env, RT_Unit
 
       | STMT_MultiVarDecl {vars; init; loc} ->
+          (* TODO: refactor this monster *)
           let callee, ret_ts = check_multi_ret_call env init in
           let _var_decl_foldr = fun vd -> fun (ts, env) ->
             (match vd with
@@ -275,7 +295,6 @@ module Make() = struct
           else List.iter2 check_type ret_ts inf_ts;
           ext_env, RT_Unit
 
-
       | STMT_Block body ->
         check_statement_block env body
 
@@ -294,14 +313,33 @@ module Make() = struct
           )
 
       | STMT_Return {values;loc} ->
-          (* TODO: just infering is fine? *)
-          let _ = List.map (infer_expression env) values in
+          let val_ts = List.map (infer_expression env) values in
+          (match TypingEnvironment.get_return env with
+            | None -> ()
+            | Some ret_ts ->
+              let val_ts_len = List.length val_ts in
+              let ret_ts_len = List.length ret_ts in
+              if val_ts_len <> ret_ts_len then
+                ErrorReporter.report_bad_number_of_return_values
+                  ~loc ~expected:ret_ts_len ~actual:val_ts_len
+              else
+                let cmp_types = fun t1 -> fun t2 ->
+                  if t1 <> t2 then
+                    ErrorReporter.report_type_mismatch
+                      ~loc:loc ~actual:t1 ~expected:t2
+                  else ()
+                in List.iter2 cmp_types val_ts ret_ts;
+          );
           env, RT_Void
 
       | STMT_VarDecl {var; init} ->
-          let t, ext_env = infer_var_decl env var in
+          (* TODO: This dim is damn ugly *)
+          let loc, has_dim, t, ext_env = infer_var_decl_dim env var in
           (match init with
-            | Some e -> check_expression env t e;
+            | Some e ->
+                if has_dim then
+                  ErrorReporter.report_array_initialization_forbidden ~loc
+                else check_expression env t e;
             | None -> ());
           ext_env, RT_Unit
 
@@ -341,6 +379,7 @@ module Make() = struct
             | ENVTP_Fn (_, ret_types) ->
               (match body with
                 | Some body ->
+                  let ext_env = TypingEnvironment.set_return env ret_types in
                   (match check_statement_block ext_env body with
                     | _, RT_Void -> ()
                     | _, RT_Unit ->
