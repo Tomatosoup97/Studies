@@ -18,6 +18,15 @@ module Make() = struct
     (* --------------------------------------------------- *)
     (* helper functions *)
 
+    let retrieve_var_type env id loc =
+      (match TypingEnvironment.lookup id env with
+        | Some (ENVTP_Var t) -> t
+        | Some _ ->
+            ErrorReporter.report_identifier_is_not_variable ~loc ~id
+        | None ->
+            ErrorReporter.report_unknown_identifier ~loc ~id
+      )
+
     (* --------------------------------------------------- *)
     (* _infer_expression wrapper filling node2type_map hashtable *)
     let rec infer_expression env e =
@@ -33,13 +42,7 @@ module Make() = struct
     (* Bottom-up strategy *)
     and _infer_expression env = function
       | EXPR_Id {id; loc; _} ->
-          (match TypingEnvironment.lookup id env with
-            | Some (ENVTP_Var t) -> t
-            | Some _ ->
-                ErrorReporter.report_identifier_is_not_variable ~loc ~id
-            | None ->
-                ErrorReporter.report_unknown_identifier ~loc ~id
-          )
+          retrieve_var_type env id loc
 
       | EXPR_Int _ -> TP_Int
 
@@ -48,11 +51,7 @@ module Make() = struct
       | EXPR_Bool _ -> TP_Bool
 
       | EXPR_Index {expr;index;loc; _} ->
-          check_expression env TP_Int index;
-          (match infer_expression env expr with
-            | (TP_Array t) -> t
-            | _ as t -> ErrorReporter.report_expected_array ~loc ~actual:t
-          )
+          infer_index_expr env loc expr index
 
       | EXPR_Call call ->
           check_function_call env call
@@ -131,7 +130,7 @@ module Make() = struct
                   else ErrorReporter.report_shadows_previous_definition ~loc ~id
 
     and infer_var_decl_dim env (VarDecl {loc; id; tp}) =
-        (* TODO: This duplicates the code above! *)
+        (* TODO: This duplicates the code above *)
         let t = infer_type_expr_dim env tp in
         let ext_env, is_new = TypingEnvironment.add id (ENVTP_Var t) env in
         if is_new then loc, t, ext_env
@@ -200,8 +199,8 @@ module Make() = struct
         )
 
     (* --------------------------------------------------- *)
-    (* Top-down strategy: zapisz w node2type_map oczekiwanie a następnie
-     * sprawdź czy nie zachodzi specjalny przypadek. *)
+    (* Top-down strategy: save expectation in node2type_map
+     * and check whether special case occured *)
     and check_expression env expected e =
       logf "%s: checking expression against %s"
         (string_of_location (location_of_expression e))
@@ -229,6 +228,14 @@ module Make() = struct
             ~actual
             ~expected
 
+    and infer_index_expr env loc expr index =
+      check_expression env TP_Int index;
+      (match infer_expression env expr with
+        | (TP_Array t) -> t
+        | _ as t -> ErrorReporter.report_expected_array ~loc ~actual:t
+      )
+
+
     (* --------------------------------------------------- *)
     (* Procedure checking helper function *)
 
@@ -247,12 +254,10 @@ module Make() = struct
 
     let check_multi_ret_call env (Call { loc ; callee; arguments; _}) =
       (match TypingEnvironment.lookup callee env with
-        | Some (ENVTP_Fn (_, [])) ->
+        | Some (ENVTP_Fn (param_ts, ([] as ts)))
+        | Some (ENVTP_Fn (param_ts, ([_] as ts))) ->
             ErrorReporter.report_expected_function_returning_many_values
-            ~loc ~id:callee ~expected:42 ~actual:0 (* TODO: expected *)
-        | Some (ENVTP_Fn (_, [t])) ->
-            ErrorReporter.report_expected_function_returning_many_values
-            ~loc ~id:callee ~expected:42 ~actual:1 (* TODO: expected *)
+            ~loc ~id:callee ~expected:(List.length param_ts) ~actual:(List.length ts)
         | Some (ENVTP_Fn (param_ts, ret_ts)) ->
             check_function_args env loc param_ts arguments;
             callee, ret_ts
@@ -267,20 +272,10 @@ module Make() = struct
 
     let infer_lvalue env = function
       | LVALUE_Id {id;loc;_} ->
-          (* TODO: this basically duplicates EXPR_Id *)
-          (match TypingEnvironment.lookup id env with
-            | Some (ENVTP_Var t) -> t
-            | Some _ ->
-                ErrorReporter.report_identifier_is_not_variable ~loc ~id
-            | None ->
-                ErrorReporter.report_unknown_identifier ~loc ~id
-          )
+          retrieve_var_type env id loc
+
       | LVALUE_Index {index; sub; loc} ->
-          check_expression env TP_Int index;
-          (match infer_expression env sub with
-            | (TP_Array t) -> t
-            | _ as t -> ErrorReporter.report_expected_array ~loc ~actual:t
-          )
+          infer_index_expr env loc sub index
 
     (* --------------------------------------------------- *)
     (* Statements *)
@@ -344,12 +339,15 @@ module Make() = struct
           ); env, RT_Void
 
       | STMT_VarDecl {var; init} ->
-          (* TODO: This dim is damn ugly *)
-          let loc, t, ext_env = infer_var_decl_dim env var in
           (match init with
-            | Some e -> check_expression env t e
-            | None -> ());
-          ext_env, RT_Unit
+            | Some e ->
+                let t, ext_env = infer_var_decl env var in
+                check_expression env t e;
+                ext_env, RT_Unit
+            | None ->
+                let loc, t, ext_env = infer_var_decl_dim env var in
+                ext_env, RT_Unit
+          )
 
       | STMT_While {cond; body; loc} ->
           check_expression env TP_Bool cond;
@@ -367,7 +365,7 @@ module Make() = struct
               let loc = (location_of_statement s) in
               (match s_res with
                 | RT_Unit -> check_statement_block_aux newEnv ss
-                (* TODO: think about more verbose error *)
+                (* Sanity check; this part is asserted in parser *)
                 | _ -> ErrorReporter.report_cannot_infer ~loc
               )
 
