@@ -132,9 +132,9 @@ module Make() = struct
 
     and infer_var_decl_dim env (VarDecl {loc; id; tp}) =
         (* TODO: This duplicates the code above! *)
-        let has_dim, t = infer_type_expr_dim env tp in
+        let t = infer_type_expr_dim env tp in
         let ext_env, is_new = TypingEnvironment.add id (ENVTP_Var t) env in
-        if is_new then loc, has_dim, t, ext_env
+        if is_new then loc, t, ext_env
                   else ErrorReporter.report_shadows_previous_definition ~loc ~id
 
     and infer_type_exprs env = List.map (infer_type_expr env)
@@ -152,15 +152,28 @@ module Make() = struct
 
     and infer_type_expr_dim env = function
       (* TODO: This duplicates the code above *)
-      | TEXPR_Int _ -> false, TP_Int
-      | TEXPR_Bool _ -> false, TP_Bool
+      | TEXPR_Int _ -> TP_Int
+      | TEXPR_Bool _ -> TP_Bool
       | TEXPR_Array {dim; sub; _} ->
           (match dim with
             | Some dim ->
                 check_expression env TP_Int dim;
-                true, TP_Array (infer_type_expr env sub)
+                TP_Array (infer_type_expr_strict_dim env sub)
             | None ->
-                false, TP_Array (infer_type_expr env sub)
+                TP_Array (infer_type_expr_dim env sub)
+          )
+
+    and infer_type_expr_strict_dim env = function
+      (* TODO: This duplicates the code above *)
+      | TEXPR_Int _ -> TP_Int
+      | TEXPR_Bool _ -> TP_Bool
+      | TEXPR_Array {dim; sub; loc} ->
+          (match dim with
+            | Some dim ->
+                check_expression env TP_Int dim;
+                TP_Array (infer_type_expr_strict_dim env sub)
+            | None ->
+                ErrorReporter.report_array_initialization_forbidden ~loc
           )
 
     and check_function_args env loc formal_params actual_params =
@@ -332,12 +345,9 @@ module Make() = struct
 
       | STMT_VarDecl {var; init} ->
           (* TODO: This dim is damn ugly *)
-          let loc, has_dim, t, ext_env = infer_var_decl_dim env var in
+          let loc, t, ext_env = infer_var_decl_dim env var in
           (match init with
-            | Some e ->
-                if has_dim then
-                  ErrorReporter.report_array_initialization_forbidden ~loc
-                else check_expression env t e;
+            | Some e -> check_expression env t e
             | None -> ());
           ext_env, RT_Unit
 
