@@ -199,6 +199,14 @@ module Make() = struct
       | EXPR_Struct {elements; _}, TP_Array tp ->
         List.iter (check_expression env tp) elements
 
+      | EXPR_Index { expr; index; _}, t ->
+          check_expression env TP_Int index;
+          check_expression env (TP_Array t) expr
+
+      | EXPR_Binop {loc; lhs; rhs; op=BINOP_Add; _}, TP_Array t ->
+          check_expression env (TP_Array t) lhs;
+          check_expression env (TP_Array t) rhs
+
       (* Bottom-up strategy fallback *)
       | _ ->
         let actual = infer_expression env e in
@@ -313,24 +321,14 @@ module Make() = struct
           )
 
       | STMT_Return {values;loc} ->
-          let val_ts = List.map (infer_expression env) values in
           (match TypingEnvironment.get_return env with
             | None -> ()
             | Some ret_ts ->
-              let val_ts_len = List.length val_ts in
-              let ret_ts_len = List.length ret_ts in
-              if val_ts_len <> ret_ts_len then
+              if List.length values <> List.length ret_ts then
                 ErrorReporter.report_bad_number_of_return_values
-                  ~loc ~expected:ret_ts_len ~actual:val_ts_len
-              else
-                let cmp_types = fun t1 -> fun t2 ->
-                  if t1 <> t2 then
-                    ErrorReporter.report_type_mismatch
-                      ~loc:loc ~actual:t1 ~expected:t2
-                  else ()
-                in List.iter2 cmp_types val_ts ret_ts;
-          );
-          env, RT_Void
+                  ~loc ~expected:(List.length ret_ts) ~actual:(List.length values)
+              else List.iter2 (check_expression env) ret_ts values 
+          ); env, RT_Void
 
       | STMT_VarDecl {var; init} ->
           (* TODO: This dim is damn ugly *)
@@ -379,7 +377,7 @@ module Make() = struct
             | ENVTP_Fn (_, ret_types) ->
               (match body with
                 | Some body ->
-                  let ext_env = TypingEnvironment.set_return env ret_types in
+                  let ext_env = TypingEnvironment.set_return ext_env ret_types in
                   (match check_statement_block ext_env body with
                     | _, RT_Void -> ()
                     | _, RT_Unit ->
