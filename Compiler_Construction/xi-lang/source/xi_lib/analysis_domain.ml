@@ -103,7 +103,7 @@ module ConstantFolding = struct
     | Some a -> Ir_utils.string_of_expr a
 
   let string_of_domain dom =
-    let f (k,v) = Format.sprintf "%s=%s" (Ir.string_of_reg k) (string_of_el v) in
+    let f (k,v) = Format.sprintf "%s=%s" (Ir_utils.string_of_reg k) (string_of_el v) in
     let seq = Ir.RegMap.to_seq dom in
     let seq = Seq.map f seq in
     String.concat " " @@ List.of_seq seq

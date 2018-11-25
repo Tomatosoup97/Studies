@@ -22,7 +22,7 @@ module Make(Steps:COMPILER_STEPS)(Params:PARAMS) = struct
 
   let describe_register_mapping mapping =
     let describe_map k v xs =
-      let entry = Format.sprintf "%s -> %s" (Ir.string_of_reg k) (Ir.string_of_reg v) in
+      let entry = Format.sprintf "%s -> %s" (Ir_utils.string_of_reg k) (Ir_utils.string_of_reg v) in
       entry :: xs
     in
     String.concat "\n" @@ Hashtbl.fold describe_map mapping []

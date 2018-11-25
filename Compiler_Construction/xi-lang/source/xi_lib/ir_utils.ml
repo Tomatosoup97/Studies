@@ -1,5 +1,18 @@
 open Ir
 
+let string_of_reg = function
+  | REG_Tmp i -> Format.sprintf "%%tmp%u" i
+  | REG_Hard i -> Format.sprintf "%%hard%u" i
+  | REG_Spec i -> Format.sprintf "%%spec%u" i
+
+let string_of_cond = function
+  | COND_Eq -> "eq"
+  | COND_Ne -> "ne"
+  | COND_Lt -> "lt"
+  | COND_Gt -> "gt"
+  | COND_Le -> "le"
+  | COND_Ge -> "ge"
+
 let remap_register_reg sb r = 
   try
     Hashtbl.find sb r

@@ -1,12 +1,11 @@
 type reg
+    (* rejestr tymczasowy *)
   = REG_Tmp of int
+    (* rejestr sprzętowy *)
   | REG_Hard of int
+    (* rejestr sprzętowy specjalnego przeznaczenia *)
   | REG_Spec of int
 
-let string_of_reg = function
-  | REG_Tmp i -> Format.sprintf "%%tmp%u" i
-  | REG_Hard i -> Format.sprintf "%%hard%u" i
-  | REG_Spec i -> Format.sprintf "%%spec%u" i
 
 let is_spec_reg = function
   | REG_Spec _ -> true
@@ -69,49 +68,74 @@ type cond
   | COND_Le
   | COND_Ge
 
-let string_of_cond = function
-  | COND_Eq -> "eq"
-  | COND_Ne -> "ne"
-  | COND_Lt -> "lt"
-  | COND_Gt -> "gt"
-  | COND_Le -> "le"
-  | COND_Ge -> "ge"
-
 
 type instr
+    (* dodaj *)
   = I_Add of reg * expr * expr
+    (* odejmij *)
   | I_Sub of reg * expr * expr
+    (* podziel *)
   | I_Div of reg * expr * expr
+    (* reszta z dzielenia *)
   | I_Rem of reg * expr * expr
+    (* pomnóż *)
   | I_Mul of reg * expr * expr
+    (* bitowy and *)
   | I_And of reg * expr * expr
+    (* bitowy or *)
   | I_Or of reg * expr * expr
+    (* bitowy xor *)
   | I_Xor of reg * expr * expr
+    (* LoadArray(r, xs, i) oznacza załaduj i-ty element tablicy xs do rejestru r *)
   | I_LoadArray of reg * expr * expr
+    (* StoreArray(xs, i, e) oznacza zapisz do i-tego elementu tablicy xs atom e *)
   | I_StoreArray of expr * expr * expr
+    (* LoadMem(r, xs, i) oznacza załaduj komórkę pamięci o adresie (xs+i) do rejestru r*)
   | I_LoadMem of reg * expr * expr
+    (* StoreMem(xs, i, e) oznacza zapisz do komórki pamięci o adresie (xs+i) atom e *)
   | I_StoreMem of expr * expr * expr
+    (* wysokopoziomowa instrukcja: konkatenacja tablic *)
   | I_Concat of reg * expr * expr
+    (* zaneguj liczbę *)
   | I_Neg of reg * expr
+    (* bitowy not *)
   | I_Not of reg * expr
+    (* zapisz atom do rejestru *)
   | I_Move of reg * expr
+    (* wysokopoziomowa instrukcja: zapisuje do rejestru długość tablicy *)
   | I_Length of reg * expr
+    (* wysokopoziomowa instrukcja: zaalokuj tablicę o określonym rozmiarze *)
   | I_NewArray of reg * expr
+    (* I_Call(rs, p, xs, ms) oznacza wywołaj p z argumentami xs, wyniki
+     * funkcji znajdą się w rejestrach rs, dodatkowo zostaną zmodyfikowane rejestry ms *)
   | I_Call of reg list * procid * expr list * reg list
-  | I_Set of reg * cond * expr * expr  
+    (* I_Set(r, cond, a, b) zapisz do rejestru r wartość boolowską warunku cond(a,b) *)
+  | I_Set of reg * cond * expr * expr
+    (* załaduj do rejestru zmienną lokalną *)
   | I_LoadVar of reg * int
+    (* zapisz atom do zmiennej lokalnej *)
   | I_StoreVar of int * expr
+    (* załaduj do rejestru komórkę ze stosu *)
   | I_LoadStack of reg * int
+    (* zapisz do komórki na stosie atom *)
   | I_StoreStack of int * expr
+    (* przydziel stos *)
   | I_StackAlloc of Int32.t
+    (* zwolnij stos *)
   | I_StackFree of Int32.t
+    (* meta-instrukcja, podane rejestry będą uznawane za użyte *)
   | I_Use of reg list
+    (* meta-instrukcja, podane rejestry będą uznane za zmodyfikowane *)
   | I_Def of reg list
 
 
 type terminator =
+    (* return *)
   | T_Return of expr list
+    (* T_Branch(cond, a, b, then_bb, else_bb) oznacza skok warunkowy
+     * if cond(a,b) then goto then_bb else goto else_bb *)
   | T_Branch of cond * expr * expr * label * label
+    (* skok bezwarunkowy *)
   | T_Jump of label 
 
 let labels_of_terminator = function
@@ -122,13 +146,13 @@ let labels_of_terminator = function
 type block = instr list
 
 module LabelGraph = Graph.Imperative.Digraph.ConcreteBidirectional(struct 
-(*module LabelGraph = Mygraph.MakeBidirectional(struct *)
   type t = label
   let compare = compare
   let hash = Hashtbl.hash
   let equal a b = a = b
   end)
 
+(* Reprezentacja ciała funkcji *)
 module ControlFlowGraph = struct
 
   type graph = LabelGraph.t 
@@ -253,11 +277,17 @@ module ControlFlowGraph = struct
 
 end
 
+(* Reprezentacja całej procedury *)
 type procedure = Procedure of
+    (* identyfikator *)
   { procid: procid
+    (* graf sterowania *)
   ; cfg: ControlFlowGraph.t
+    (* rozmiar rekordu aktywacji *)
   ; mutable frame_size: int
+    (* ilość parametrów formalnych *)
   ; formal_parameters: int
+    (* funkcja do przydzielania świeżych rejestrów wewnątrz danej proceduy *)
   ; allocate_register: unit -> reg
   }
 
@@ -278,11 +308,14 @@ let procid_of_procedure (Procedure {procid; _}) = procid
 let frame_size_of_procedure (Procedure {frame_size; _}) = frame_size
 
 
+(* Reprezentacja programu *)
 type program = Program of
+    (* lista procedur *)
   { procedures: procedure list
-  ; externals: procid list
+    (* lista wszystkich symboli *)
+  ; symbols: procid list
   }
 
 let procedures_of_program (Program{procedures; _}) = procedures
 
-let externals_of_program (Program{externals; _}) = externals
+let symbols_of_program (Program{symbols; _}) = symbols

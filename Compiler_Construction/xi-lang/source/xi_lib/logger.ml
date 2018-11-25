@@ -134,7 +134,7 @@ let dump_ir_proc title irproc =
   dump_string title buffer
 
 let dump_spill_costs spill_costs =
-  let f (k,v) = Format.sprintf "%s -> %u" (Ir.string_of_reg k) v in 
+  let f (k,v) = Format.sprintf "%s -> %u" (Ir_utils.string_of_reg k) v in 
   let seq = Hashtbl.to_seq spill_costs in
   let seq = Seq.map f seq in
   let seq = List.of_seq seq in
@@ -142,7 +142,7 @@ let dump_spill_costs spill_costs =
   dump_string "spill_costs" buf
 
 let dump_spill_costs_f spill_costs =
-  let f (k,v) = Format.sprintf "%s -> %f" (Ir.string_of_reg k) v in 
+  let f (k,v) = Format.sprintf "%s -> %f" (Ir_utils.string_of_reg k) v in 
   let seq = Hashtbl.to_seq spill_costs in
   let seq = Seq.map f seq in
   let seq = List.of_seq seq in

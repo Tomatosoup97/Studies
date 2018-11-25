@@ -30,9 +30,10 @@ module Plugin : PLUGIN = struct
   (* Set to None to use built-in lexer and parser *)
   let lexer_and_parser = Some (module LexerAndParser : LEXER_AND_PARSER)
 
+  (* Set to None to use built-in typechecker *)
   let make_typechecker = Some (module Typechecker.Make : MAKE_TYPECHECKER)
 
-  let make_translator = None
+  let make_translator = Some (module Translator.Make : MAKE_TRANSLATOR)
 
   let make_jump_threading = None
 
