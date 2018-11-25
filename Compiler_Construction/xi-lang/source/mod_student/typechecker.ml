@@ -235,7 +235,6 @@ module Make() = struct
         | _ as t -> ErrorReporter.report_expected_array ~loc ~actual:t
       )
 
-
     (* --------------------------------------------------- *)
     (* Procedure checking helper function *)
 
