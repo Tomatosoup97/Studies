@@ -1,3 +1,4 @@
+(* vim: set softtabstop=2 sw=2: *)
 open Xi_lib
 open Ir
 
@@ -64,13 +65,13 @@ module Make() = struct
 
     let scan_global_declaration (env, symbols) = function
       | Ast.GDECL_Function {id; formal_parameters; return_types; _} ->
-        let name = Format.sprintf "%s_%s_%s" 
+        let name = Format.sprintf "%s_%s_%s"
           (mangle_id id) (mangle_formal_parameters formal_parameters) (mangle_return_types return_types)
           in
-        
+
         Environment.add_proc id (Procid name) env, Procid name :: symbols
 
-    let scan_module env (Ast.ModuleDefinition {global_declarations; _}) = 
+    let scan_module env (Ast.ModuleDefinition {global_declarations; _}) =
       List.fold_left scan_global_declaration (env, []) global_declarations
 
   end
@@ -89,22 +90,22 @@ module Make() = struct
   module Translator(M:SContext) = struct
     open M
 
-    (* dodaj instrukcje do bloku *)
+    (* append instruction to basic block *)
     let append_instruction l i =
       let block = ControlFlowGraph.block cfg l in
       ControlFlowGraph.set_block cfg l (block @ [i])
 
-    (* ustaw terminator na skok bezwarunkowy *)
+    (* set terminator to unconditional jump *)
     let set_jump l_from l_to =
       ControlFlowGraph.set_terminator cfg l_from @@ T_Jump l_to;
       ControlFlowGraph.connect cfg l_from l_to
 
-    (* ustaw terminator na powrót-z-procedury *)
+    (* set terminator to return-from-procedure *)
     let set_return l_from xs =
       ControlFlowGraph.set_terminator cfg l_from @@ T_Return xs;
       ControlFlowGraph.connect cfg l_from (ControlFlowGraph.exit_label cfg)
 
-    (* ustaw terminator na skok warunkowy *)
+    (* set terminator to conditional jump *)
     let set_branch cond a b l_from l_to1 l_to2 =
       ControlFlowGraph.set_terminator cfg l_from @@ T_Branch (cond, a, b, l_to1, l_to2);
       ControlFlowGraph.connect cfg l_from l_to1;
@@ -115,6 +116,15 @@ module Make() = struct
     let i32_0 = Int32.of_int 0
     let i32_1 = Int32.of_int 1
 
+    let op_instr res_reg lhs rhs = function
+      | Ast.BINOP_Add -> I_Add (res_reg, lhs, rhs)
+      | Ast.BINOP_Sub -> I_Sub (res_reg, lhs, rhs)
+      | Ast.BINOP_Mult -> I_Mul (res_reg, lhs, rhs)
+      | Ast.BINOP_Div -> I_Div (res_reg, lhs, rhs)
+      | Ast.BINOP_Rem -> I_Rem (res_reg, lhs, rhs)
+      | _ -> failwith "not yet implemented"
+
+
     (* --------------------------------------------------- *)
     let rec translate_expression env current_bb = function
       | Ast.EXPR_Char {value; _} ->
@@ -123,11 +133,22 @@ module Make() = struct
       | Ast.EXPR_Id {id; _} ->
         current_bb, E_Reg (Environment.lookup_var id env)
 
+      | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_Or; _}
+      | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_And; _} ->
+        failwith "not yet implemented"
+
+      | Ast.EXPR_Binop {lhs; rhs; op; _} ->
+          let res_reg = allocate_register () in
+          let current_bb, lhs_res = translate_expression env current_bb lhs in
+          let current_bb, rhs_res = translate_expression env current_bb rhs in
+          append_instruction current_bb @@ op_instr res_reg lhs_res rhs_res op;
+          current_bb, E_Reg res_reg
+
       | _ ->
         failwith "not yet implemented"
 
     (* --------------------------------------------------- *)
-    and translate_condition env current_bb else_bb = function 
+    and translate_condition env current_bb else_bb = function
       | Ast.EXPR_Bool {value=true; _} ->
         current_bb
 
@@ -139,7 +160,7 @@ module Make() = struct
 
       | e ->
         let current_bb, res = translate_expression env current_bb e in
-        let next_bb = allocate_block () in 
+        let next_bb = allocate_block () in
         set_branch COND_Ne res (E_Int i32_0) current_bb next_bb else_bb;
         next_bb
 
@@ -160,28 +181,28 @@ module Make() = struct
       env, r
 
     let bind_formal_parameters env xs =
-      let f env x = fst (bind_var_declaration env x) in 
+      let f env x = fst (bind_var_declaration env x) in
       List.fold_left f env xs
 
   let translate_global_definition env = function
     | Ast.GDECL_Function {id; body=Some body; formal_parameters;_} ->
-      let procid = Environment.lookup_proc id env in 
+      let procid = Environment.lookup_proc id env in
       let frame_size = 0 in
       let env = bind_formal_parameters env formal_parameters in
       let formal_parameters = List.length formal_parameters in
       let proc = Procedure {procid; cfg; frame_size; allocate_register; formal_parameters} in
       let first_bb = allocate_block () in
-      let _, last_bb = translate_block env first_bb body in 
+      let _, last_bb = translate_block env first_bb body in
       ControlFlowGraph.connect cfg  last_bb (ControlFlowGraph.exit_label cfg);
       ControlFlowGraph.connect cfg  (ControlFlowGraph.entry_label cfg) first_bb;
       [proc]
-    
+
     | _ ->
       []
 
   end
 
-  let make_allocate_register () = 
+  let make_allocate_register () =
     let counter = ref 0 in
     fun () ->
       let i = !counter in
@@ -189,7 +210,7 @@ module Make() = struct
       REG_Tmp i
 
 
-    let translate_global_definition node2type env gdef = 
+    let translate_global_definition node2type env gdef =
       let cfg = ControlFlowGraph.create () in
       let module T = Translator(struct
         let cfg = cfg
@@ -207,3 +228,4 @@ module Make() = struct
       let procedures = translate_module node2type env mdef in
       Program {procedures; symbols}
   end
+
