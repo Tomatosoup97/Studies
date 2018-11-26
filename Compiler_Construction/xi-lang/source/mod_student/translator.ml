@@ -116,7 +116,7 @@ module Make() = struct
     let i32_0 = Int32.of_int 0
     let i32_1 = Int32.of_int 1
 
-    let op_instr res_reg lhs rhs = function
+    let binop_instr res_reg lhs rhs = function
       | Ast.BINOP_Add -> I_Add (res_reg, lhs, rhs)
       | Ast.BINOP_Sub -> I_Sub (res_reg, lhs, rhs)
       | Ast.BINOP_Mult -> I_Mul (res_reg, lhs, rhs)
@@ -124,28 +124,43 @@ module Make() = struct
       | Ast.BINOP_Rem -> I_Rem (res_reg, lhs, rhs)
       | _ -> failwith "not yet implemented"
 
+    let unop_instr res_reg sub = function
+      | Ast.UNOP_Not -> I_Not (res_reg, sub)
+      | Ast.UNOP_Neg -> I_Neg (res_reg, sub)
 
     (* --------------------------------------------------- *)
     let rec translate_expression env current_bb = function
       | Ast.EXPR_Char {value; _} ->
-        current_bb, E_Int (Int32.of_int @@ Char.code value)
+          current_bb, E_Int (Int32.of_int @@ Char.code value)
+
+      | Ast.EXPR_Bool {b; _} ->
+          current_bb, E_Int (if b then 1 else 0)
 
       | Ast.EXPR_Id {id; _} ->
-        current_bb, E_Reg (Environment.lookup_var id env)
+          current_bb, E_Reg (Environment.lookup_var id env)
 
       | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_Or; _}
       | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_And; _} ->
-        failwith "not yet implemented"
+          failwith "not yet implemented"
 
       | Ast.EXPR_Binop {lhs; rhs; op; _} ->
           let res_reg = allocate_register () in
           let current_bb, lhs_res = translate_expression env current_bb lhs in
           let current_bb, rhs_res = translate_expression env current_bb rhs in
-          append_instruction current_bb @@ op_instr res_reg lhs_res rhs_res op;
+          append_instruction current_bb @@ binop_instr res_reg lhs_res rhs_res op;
           current_bb, E_Reg res_reg
 
+      | Ast.EXPR_Unop {op; sub; _} ->
+          let res_reg = allocate_register () in
+          let current_bb, sub_res = translate_expression env current_bb sub in
+          append_instruction current_bb @@ unop_instr res_reg sub_res op;
+          current_bb, E_Reg res_reg
+
+      | Ast.EXPR_Index {expr; index; _} ->
+          failwith "not yet implemented"
+
       | _ ->
-        failwith "not yet implemented"
+          failwith "not yet implemented"
 
     (* --------------------------------------------------- *)
     and translate_condition env current_bb else_bb = function
