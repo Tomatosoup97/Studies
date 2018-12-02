@@ -5,6 +5,8 @@ open Ir
 let i32_0 = Int32.of_int 0
 let i32_1 = Int32.of_int 1
 
+let uncurry f = fun (x, y) -> f x y
+
 (* --------------------------------------------------- *)
 
 module Make() = struct
@@ -116,6 +118,8 @@ module Make() = struct
     let i32_0 = Int32.of_int 0
     let i32_1 = Int32.of_int 1
 
+    let typechecker_error = failwith "Invalid type, typechecker should have failed!"
+
     let binop_instr res_reg lhs rhs = function
       | Ast.BINOP_Sub -> I_Sub (res_reg, lhs, rhs)
       | Ast.BINOP_Mult -> I_Mul (res_reg, lhs, rhs)
@@ -132,18 +136,30 @@ module Make() = struct
       | Ast.EXPR_Char {value; _} ->
           current_bb, E_Int (Int32.of_int @@ Char.code value)
 
+      | Ast.EXPR_Int {value; _} ->
+          current_bb, E_Int value
+
       | Ast.EXPR_Bool {value; _} ->
-          current_bb, E_Int (Int32.of_int (if value then 1 else 0))
+          current_bb, E_Int (if value then i32_1 else i32_0)
 
       | Ast.EXPR_String {value; _} ->
           let str_reg = allocate_register () in
           let str_len = Int32.of_int (String.length value) in
           append_instruction current_bb @@ I_NewArray (str_reg, E_Int str_len);
-          (* TODO: do I need to insert one char by one with I_StoreArray? *)
+          String.iteri (fun i -> fun c ->
+            append_instruction current_bb @@ I_StoreArray
+            (E_Reg str_reg,
+             E_Int (Int32.of_int i),
+             E_Int (Int32.of_int @@ Char.code c));
+          ) value;
           current_bb, E_Reg str_reg
 
       | Ast.EXPR_Id {id; _} ->
           current_bb, E_Reg (Environment.lookup_var id env)
+
+      | Ast.EXPR_Relation {lhs; rhs; op; _} ->
+          (* translate_condition? *)
+          failwith "not yet implemented"
 
       | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_Or; _}
       | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_And; _} ->
@@ -159,7 +175,7 @@ module Make() = struct
                         I_Add (res_reg, lhs_res, rhs_res)
             | TP_Array t -> append_instruction current_bb @@
                             I_Concat (res_reg, lhs_res, rhs_res)
-            | _ -> failwith "Cannot add given type, typechecker should have failed!"
+            | _ -> typechecker_error
           );
           current_bb, E_Reg res_reg
 
@@ -184,12 +200,17 @@ module Make() = struct
           current_bb, E_Reg res_reg
 
       | Ast.EXPR_Struct {elements; _} ->
-          (* TODO
-           * for each element translate_expression and append result to xs
-           * allocate len(elements) array
-           * for each x in xs StoreArray?
-           *)
-          failwith "not yet implemented"
+          let res_reg = allocate_register () in
+          let struct_len = Int32.of_int (List.length elements) in
+          append_instruction current_bb @@ I_NewArray (res_reg, E_Int struct_len);
+          List.iteri (fun i -> fun elem ->
+            let bb', res = translate_expression env current_bb elem in
+            append_instruction current_bb @@ I_StoreArray
+            (E_Reg res_reg,
+             E_Int (Int32.of_int i),
+             res);
+          ) elements;
+          current_bb, E_Reg res_reg
 
       | Ast.EXPR_Length {arg; _} ->
           let res_reg = allocate_register () in
@@ -197,8 +218,24 @@ module Make() = struct
           append_instruction current_bb @@ I_Length (res_reg, arg_res);
           current_bb, E_Reg res_reg
 
-      | _ ->
-          failwith "not yet implemented"
+      | Ast.EXPR_Call call ->
+          (match translate_call env current_bb 1 call with
+            | bb, [res] -> bb, E_Reg res
+            | _ -> typechecker_error
+          )
+
+    and translate_call env current_bb num_of_results (Call {callee; arguments; _}) =
+        let n_elem_list n = (Array.make n 0 |> Array.to_list) in
+        let res_regs =
+          List.map (fun _ -> allocate_register ())  (n_elem_list num_of_results)
+        in let procid = Environment.lookup_proc callee env in
+        let bb, args_res = List.fold_left (fun (bb, args) -> fun arg ->
+            let bb', res = translate_expression env bb arg in
+            (bb', args @ [res])
+        ) (current_bb,  []) arguments
+        in append_instruction current_bb @@ I_Call (res_regs, procid, args_res, []);
+        current_bb, res_regs
+
 
     (* --------------------------------------------------- *)
     and translate_condition env current_bb else_bb = function
@@ -224,7 +261,6 @@ module Make() = struct
       | Ast.STMT_Assign {lhs; rhs; _} ->
           (match lhs with
             | Ast.LVALUE_Id {id; _} ->
-                (* TODO: recheck *)
                 let var = Environment.lookup_var id env in
                 let current_bb, rhs_res = translate_expression env current_bb rhs in
                 append_instruction current_bb @@ I_Move (var, rhs_res)
@@ -235,11 +271,10 @@ module Make() = struct
                 let current_bb, rhs_res = translate_expression env current_bb rhs in
                 append_instruction current_bb @@ I_StoreArray (xs, index, rhs_res)
           );
-          current_bb
+          env, current_bb
 
       | Ast.STMT_VarDecl {var; init; _} ->
           (* TODO case when var is array *)
-          (* TODO: what to do with ext_env? nothing? *)
           (*
           (match Hashtbl.find node2type tag with
             | TP_Int -> ();
@@ -251,40 +286,51 @@ module Make() = struct
                 let current_bb, init_res = translate_expression env current_bb init in
                 let ext_env, var_reg = bind_var_declaration env var in
                 append_instruction current_bb @@ I_Move (var_reg, init_res);
-                current_bb
+                ext_env, current_bb
             | None ->
-                (* TODO: We do nothing here? *)
                 let ext_env, var_reg = bind_var_declaration env var in
-                current_bb
+                ext_env, current_bb
           )
 
       | Ast.STMT_If { cond; then_branch; else_branch; _} ->
           let bb_else = allocate_block () in
           let bb_then = translate_condition env current_bb bb_else cond in
-          let bb_then' = translate_statement env bb_then then_branch in
+          let _, bb_then' = translate_statement env bb_then then_branch in
           let bb_merge = allocate_block() in
           (match else_branch with
             | Some else_branch ->
-                let bb_else' = translate_statement env bb_else else_branch in
+                let _, bb_else' = translate_statement env bb_else else_branch in
                 set_jump bb_else' bb_merge
             | None ->
                 set_jump bb_else bb_merge
           );
           set_jump bb_then' bb_merge;
-          bb_merge
+          env, bb_merge
 
       | Ast.STMT_Block body ->
-          let _, current_bb = translate_block env current_bb body in
-          current_bb
+          translate_block env current_bb body
+
+      | Ast.STMT_Return {values; _} ->
+          let transl_values (current_bb, xs) value =
+            let current_bb', x = translate_expression env current_bb value in
+            (current_bb', xs @ [x])
+          in
+          let current_bb, results = List.fold_left transl_values (current_bb, []) values in
+          set_return current_bb results;
+          env, current_bb
+
+      | Ast.STMT_Call call ->
+          let bb', _ = translate_call env current_bb 0 call in
+          env, bb'
 
       | _ ->
         failwith "not yet implemented"
 
     and translate_block env current_bb (Ast.STMTBlock {body; _}) =
-      failwith "not yet implemented"
+        let env', res_bb = List.fold_left
+          (uncurry translate_statement) (env, current_bb) body
+        in env', res_bb
 
-    (* TODO: it was let, not and, does it mean that we shouldn't use it in
-    * translate statement? *)
     and bind_var_declaration env vardecl =
       let r = allocate_register () in
       let env = Environment.add_var (Ast.identifier_of_var_declaration vardecl) r env in
