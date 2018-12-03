@@ -115,9 +115,6 @@ module Make() = struct
 
     let allocate_block () = ControlFlowGraph.allocate_block cfg
 
-    let i32_0 = Int32.of_int 0
-    let i32_1 = Int32.of_int 1
-
     let typechecker_error = fun () -> failwith "Invalid type, typechecker should have failed!"
 
     let binop_instr res_reg lhs rhs = function
@@ -165,19 +162,25 @@ module Make() = struct
       | Ast.EXPR_Id {id; _} ->
           current_bb, E_Reg (Environment.lookup_var id env)
 
-      | Ast.EXPR_Relation {lhs; rhs; op; _} as rel ->
+      | Ast.EXPR_Relation {lhs; rhs; op; _} as bin_expr ->
           (* TODO: recheck this *)
           let r = allocate_register () in
           let else_bb = allocate_block () in
-          let bb' = translate_condition env current_bb else_bb rel in
-          append_instruction bb' @@ I_Move (r, E_Int (Int32.of_int 1));
-          append_instruction else_bb @@ I_Move (r, E_Int (Int32.of_int 1));
+          let bb' = translate_condition env current_bb else_bb bin_expr in
+          append_instruction bb' @@ I_Move (r, E_Int i32_1);
+          append_instruction else_bb @@ I_Move (r, E_Int i32_0);
           bb', E_Reg r
 
       | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_Or; _}
-      | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_And; _} ->
-          (* translate_condition? *)
-          failwith "not yet implemented"
+      | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_And; _} as bin_expr ->
+          (* TODO: recheck this *)
+          (* TODO: coalesce with EXPR_Relation? *)
+          let r = allocate_register () in
+          let else_bb = allocate_block () in
+          let bb' = translate_condition env current_bb else_bb bin_expr in
+          append_instruction bb' @@ I_Move (r, E_Int i32_1);
+          append_instruction else_bb @@ I_Move (r, E_Int i32_0);
+          bb', E_Reg r
 
       | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_Add; tag; _} ->
           let res_reg = allocate_register () in
@@ -249,7 +252,6 @@ module Make() = struct
         in append_instruction current_bb @@ I_Call (res_regs, procid, args_res, []);
         current_bb, res_regs
 
-
     (* --------------------------------------------------- *)
     and translate_condition env current_bb else_bb = function
       | Ast.EXPR_Bool {value=true; _} ->
@@ -258,8 +260,6 @@ module Make() = struct
       | Ast.EXPR_Bool {value=false; _} ->
         set_jump current_bb else_bb;
         allocate_block ()
-
-      (* Zaimplementuj dodatkowe przypadki *)
 
       | Ast.EXPR_Relation {lhs; op; rhs; _} ->
           (* TODO: I don't trust this yet *)
@@ -272,6 +272,28 @@ module Make() = struct
           set_branch cond lhs_res rhs_res current_bb bb_then else_bb;
           bb_then
 
+      | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_Or; _} ->
+          (* TODO: does it make sense? *)
+          (* TODO: are bb_l and bb_right_then necessary? *)
+          let bb_after = allocate_block () in
+          let bb_right = allocate_block () in
+          let bb_l, lhs_res = translate_expression env current_bb lhs in
+          set_branch COND_Eq lhs_res (E_Int i32_1) bb_l bb_after bb_right;
+          let bb_right_then, rhs_res = translate_expression env bb_right rhs in
+          set_branch COND_Eq rhs_res (E_Int i32_1) bb_right_then bb_after else_bb;
+          bb_after
+
+      | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_And; _} ->
+          (* TODO: does it make sense? *)
+          (* TODO: are bb_l and bb_right_then necessary? *)
+          let bb_right = allocate_block () in
+          let bb_l, lhs_res = translate_expression env current_bb lhs in
+          set_branch COND_Ne lhs_res (E_Int i32_0) bb_l bb_right else_bb;
+          let bb_right_then, rhs_res = translate_expression env bb_right rhs in
+          let bb_after = allocate_block () in
+          set_branch COND_Ne rhs_res (E_Int i32_0) bb_right_then bb_after else_bb;
+          bb_after
+
       | e ->
         let current_bb, res = translate_expression env current_bb e in
         let next_bb = allocate_block () in
@@ -279,7 +301,6 @@ module Make() = struct
         next_bb
 
     (* --------------------------------------------------- *)
-
     let rec translate_statement env current_bb = function
       | Ast.STMT_Assign {lhs; rhs; _} ->
           (match lhs with
