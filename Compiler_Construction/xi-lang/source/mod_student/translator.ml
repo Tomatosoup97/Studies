@@ -118,7 +118,7 @@ module Make() = struct
     let i32_0 = Int32.of_int 0
     let i32_1 = Int32.of_int 1
 
-    let typechecker_error = failwith "Invalid type, typechecker should have failed!"
+    let typechecker_error = fun () -> failwith "Invalid type, typechecker should have failed!"
 
     let binop_instr res_reg lhs rhs = function
       | Ast.BINOP_Sub -> I_Sub (res_reg, lhs, rhs)
@@ -130,6 +130,14 @@ module Make() = struct
     let unop_instr res_reg sub = function
       | Ast.UNOP_Not -> I_Not (res_reg, sub)
       | Ast.UNOP_Neg -> I_Neg (res_reg, sub)
+
+    let relop_instr = function
+      | Ast.RELOP_Eq -> COND_Eq
+      | Ast.RELOP_Ne -> COND_Ne
+      | Ast.RELOP_Lt -> COND_Lt
+      | Ast.RELOP_Gt -> COND_Gt
+      | Ast.RELOP_Ge -> COND_Ge
+      | Ast.RELOP_Le -> COND_Le
 
     (* --------------------------------------------------- *)
     let rec translate_expression env current_bb = function
@@ -157,9 +165,14 @@ module Make() = struct
       | Ast.EXPR_Id {id; _} ->
           current_bb, E_Reg (Environment.lookup_var id env)
 
-      | Ast.EXPR_Relation {lhs; rhs; op; _} ->
-          (* translate_condition? *)
-          failwith "not yet implemented"
+      | Ast.EXPR_Relation {lhs; rhs; op; _} as rel ->
+          (* TODO: recheck this *)
+          let r = allocate_register () in
+          let else_bb = allocate_block () in
+          let bb' = translate_condition env current_bb else_bb rel in
+          append_instruction bb' @@ I_Move (r, E_Int (Int32.of_int 1));
+          append_instruction else_bb @@ I_Move (r, E_Int (Int32.of_int 1));
+          bb', E_Reg r
 
       | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_Or; _}
       | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_And; _} ->
@@ -175,7 +188,7 @@ module Make() = struct
                         I_Add (res_reg, lhs_res, rhs_res)
             | TP_Array t -> append_instruction current_bb @@
                             I_Concat (res_reg, lhs_res, rhs_res)
-            | _ -> typechecker_error
+            | _ -> typechecker_error ()
           );
           current_bb, E_Reg res_reg
 
@@ -221,7 +234,7 @@ module Make() = struct
       | Ast.EXPR_Call call ->
           (match translate_call env current_bb 1 call with
             | bb, [res] -> bb, E_Reg res
-            | _ -> typechecker_error
+            | _ -> typechecker_error ()
           )
 
     and translate_call env current_bb num_of_results (Call {callee; arguments; _}) =
@@ -248,12 +261,22 @@ module Make() = struct
 
       (* Zaimplementuj dodatkowe przypadki *)
 
+      | Ast.EXPR_Relation {lhs; op; rhs; _} ->
+          (* TODO: I don't trust this yet *)
+          let r1 = allocate_register () in
+          let r2 = allocate_register () in
+          let bb, lhs_res = translate_expression env current_bb lhs in
+          let bb', rhs_res = translate_expression env bb rhs in
+          let cond = relop_instr op in
+          let bb_then = allocate_block () in
+          set_branch cond lhs_res rhs_res current_bb bb_then else_bb;
+          bb_then
+
       | e ->
         let current_bb, res = translate_expression env current_bb e in
         let next_bb = allocate_block () in
         set_branch COND_Ne res (E_Int i32_0) current_bb next_bb else_bb;
         next_bb
-
 
     (* --------------------------------------------------- *)
 
@@ -323,8 +346,30 @@ module Make() = struct
           let bb', _ = translate_call env current_bb 0 call in
           env, bb'
 
-      | _ ->
-        failwith "not yet implemented"
+      | Ast.STMT_While {cond; body; _} ->
+          (* TODO: this doesn't work as expected *)
+          let bb_after = allocate_block () in
+          let bb_cond = allocate_block () in
+          let bb_then = translate_condition env bb_cond bb_after cond in
+          let _, bb_body = translate_statement env bb_then body in
+          set_jump bb_body bb_cond;
+          env, bb_after
+
+      | Ast.STMT_MultiVarDecl {vars; init; _} ->
+          (* TODO: Refactor this fold_left *)
+          let res_count = List.length vars in
+          let bb', init_regs = translate_call env current_bb res_count init in
+          let bb', env' = List.fold_left2 (
+            fun (bb, env as acc) -> fun init_reg -> fun vardecl ->
+              (match vardecl with
+                | Some vardecl ->
+                  let env', var_reg = bind_var_declaration env vardecl in
+                  append_instruction bb @@ I_Move (var_reg, E_Reg init_reg);
+                  bb, env'
+                | None -> acc
+              )
+            ) (current_bb, env) init_regs vars
+          in env', bb'
 
     and translate_block env current_bb (Ast.STMTBlock {body; _}) =
         let env', res_bb = List.fold_left
