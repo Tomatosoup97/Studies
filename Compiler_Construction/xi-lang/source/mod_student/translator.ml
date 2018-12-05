@@ -58,7 +58,6 @@ module Make() = struct
       | Ast.TEXPR_Bool _ -> "b"
       | Ast.TEXPR_Array {sub;_} -> "a" ^ mangle_texpr sub
 
-
     let mangle_var_declaration v = mangle_texpr @@ Ast.type_expression_of_var_declaration v
 
     let mangle_formal_parameters xs = String.concat "" (List.map mangle_var_declaration xs)
@@ -171,16 +170,17 @@ module Make() = struct
           append_instruction else_bb @@ I_Move (r, E_Int i32_0);
           bb', E_Reg r
 
-      | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_Or; _}
-      | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_And; _} as bin_expr ->
-          (* TODO: recheck this *)
-          (* TODO: coalesce with EXPR_Relation? *)
+      | Ast.EXPR_Binop {op=Ast.BINOP_Or; _}
+      | Ast.EXPR_Binop {op=Ast.BINOP_And; _} as bin_expr ->
           let r = allocate_register () in
-          let else_bb = allocate_block () in
-          let bb' = translate_condition env current_bb else_bb bin_expr in
-          append_instruction bb' @@ I_Move (r, E_Int i32_1);
-          append_instruction else_bb @@ I_Move (r, E_Int i32_0);
-          bb', E_Reg r
+          let bb_res = allocate_block () in
+          let bb_else = allocate_block () in
+          let bb_then = translate_condition env current_bb bb_else bin_expr in
+          append_instruction bb_then @@ I_Move (r, E_Int i32_1);
+          append_instruction bb_else @@ I_Move (r, E_Int i32_0);
+          set_jump bb_then bb_res;
+          set_jump bb_else bb_res;
+          bb_res, E_Reg r
 
       | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_Add; tag; _} ->
           let res_reg = allocate_register () in
@@ -275,6 +275,7 @@ module Make() = struct
       | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_Or; _} ->
           (* TODO: does it make sense? *)
           (* TODO: are bb_l and bb_right_then necessary? *)
+          (* This seems like it works *)
           let bb_after = allocate_block () in
           let bb_right = allocate_block () in
           let bb_l, lhs_res = translate_expression env current_bb lhs in
@@ -338,17 +339,16 @@ module Make() = struct
 
       | Ast.STMT_If { cond; then_branch; else_branch; _} ->
           let bb_else = allocate_block () in
-          let bb_then = translate_condition env current_bb bb_else cond in
-          let _, bb_then' = translate_statement env bb_then then_branch in
           let bb_merge = allocate_block() in
+          let bb_then = translate_condition env current_bb bb_else cond in
+          set_jump bb_else bb_merge;
+          set_jump bb_then bb_merge;
+          let _, bb_then = translate_statement env bb_then then_branch in
           (match else_branch with
             | Some else_branch ->
-                let _, bb_else' = translate_statement env bb_else else_branch in
-                set_jump bb_else' bb_merge
-            | None ->
-                set_jump bb_else bb_merge
+                let _, _ = translate_statement env bb_else else_branch in ()
+            | None -> ()
           );
-          set_jump bb_then' bb_merge;
           env, bb_merge
 
       | Ast.STMT_Block body ->
