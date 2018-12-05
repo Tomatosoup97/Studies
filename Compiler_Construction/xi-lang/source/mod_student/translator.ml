@@ -245,7 +245,7 @@ module Make() = struct
         let res_regs =
           List.map (fun _ -> allocate_register ())  (n_elem_list num_of_results)
         in let procid = Environment.lookup_proc callee env in
-        let bb, args_res = List.fold_left (fun (bb, args) -> fun arg ->
+        let current_bb, args_res = List.fold_left (fun (bb, args) -> fun arg ->
             let bb', res = translate_expression env bb arg in
             (bb', args @ [res])
         ) (current_bb,  []) arguments
@@ -319,13 +319,20 @@ module Make() = struct
           env, current_bb
 
       | Ast.STMT_VarDecl {var; init; _} ->
-          (* TODO case when var is array *)
-          (*
-          (match Hashtbl.find node2type tag with
-            | TP_Int -> ();
-            | TP_Array -> append_instruction current_bb @@ I_Move (var_reg, init_res)
-          )
-          *)
+          (* TODO: we allocate new array and then... what? we should use it somewhere *)
+          let get_var_type = fun (Ast.VarDecl {tp; _}) -> tp in
+          let rec translate_array_decl var_type =
+            (match var_type with
+              | Ast.TEXPR_Array {sub; dim=None; _} -> translate_array_decl sub
+              | Ast.TEXPR_Array {sub; dim=Some dim; _} ->
+                  let arr = allocate_register () in
+                  let current_bb, len = translate_expression env current_bb dim in
+                  append_instruction current_bb @@ I_NewArray (arr, len);
+                  translate_array_decl sub
+              | _ -> ()
+            )
+          in
+          translate_array_decl (get_var_type var);
           (match init with
             | Some init ->
                 let current_bb, init_res = translate_expression env current_bb init in
@@ -368,9 +375,9 @@ module Make() = struct
           env, bb'
 
       | Ast.STMT_While {cond; body; _} ->
-          (* TODO: this doesn't work as expected *)
           let bb_after = allocate_block () in
           let bb_cond = allocate_block () in
+          set_jump current_bb bb_cond;
           let bb_then = translate_condition env bb_cond bb_after cond in
           let _, bb_body = translate_statement env bb_then body in
           set_jump bb_body bb_cond;

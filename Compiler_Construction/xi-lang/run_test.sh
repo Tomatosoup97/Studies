@@ -9,6 +9,7 @@ echo "----------  ir   ----------" && \
 cat "xilog/006.translate.translated.ir" && \
 echo "----------  test ----------" && \
 cat -n $TEST_NAME && \
+echo "" && \
 echo "----------  run  ----------" && \
 spim -file main.s
 
