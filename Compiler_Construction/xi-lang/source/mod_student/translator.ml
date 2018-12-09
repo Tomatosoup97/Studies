@@ -116,6 +116,10 @@ module Make() = struct
 
     let typechecker_error = fun () -> failwith "Invalid type, typechecker should have failed!"
 
+    let n_elem_list n = (Array.make n 0 |> Array.to_list)
+
+    let n_registers n = List.map (fun _ -> allocate_register ())  (n_elem_list n)
+
     let binop_instr res_reg lhs rhs = function
       | Ast.BINOP_Sub -> I_Sub (res_reg, lhs, rhs)
       | Ast.BINOP_Mult -> I_Mul (res_reg, lhs, rhs)
@@ -162,7 +166,6 @@ module Make() = struct
           current_bb, E_Reg (Environment.lookup_var id env)
 
       | Ast.EXPR_Relation {lhs; rhs; op; _} as bin_expr ->
-          (* TODO: recheck this *)
           let r = allocate_register () in
           let else_bb = allocate_block () in
           let bb' = translate_condition env current_bb else_bb bin_expr in
@@ -241,10 +244,8 @@ module Make() = struct
           )
 
     and translate_call env current_bb num_of_results (Call {callee; arguments; _}) =
-        let n_elem_list n = (Array.make n 0 |> Array.to_list) in
-        let res_regs =
-          List.map (fun _ -> allocate_register ())  (n_elem_list num_of_results)
-        in let procid = Environment.lookup_proc callee env in
+        let res_regs = n_registers num_of_results in
+        let procid = Environment.lookup_proc callee env in
         let current_bb, args_res = List.fold_left (fun (bb, args) -> fun arg ->
             let bb', res = translate_expression env bb arg in
             (bb', args @ [res])
@@ -263,13 +264,10 @@ module Make() = struct
 
       | Ast.EXPR_Relation {lhs; op; rhs; _} ->
           (* TODO: I don't trust this yet *)
-          let r1 = allocate_register () in
-          let r2 = allocate_register () in
           let bb, lhs_res = translate_expression env current_bb lhs in
           let bb', rhs_res = translate_expression env bb rhs in
-          let cond = relop_instr op in
           let bb_then = allocate_block () in
-          set_branch cond lhs_res rhs_res current_bb bb_then else_bb;
+          set_branch (relop_instr op) lhs_res rhs_res bb' bb_then else_bb;
           bb_then
 
       | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_Or; _} ->
@@ -319,29 +317,54 @@ module Make() = struct
           env, current_bb
 
       | Ast.STMT_VarDecl {var; init; _} ->
-          (* TODO: we allocate new array and then... what? we should use it somewhere *)
           let get_var_type = fun (Ast.VarDecl {tp; _}) -> tp in
-          let rec translate_array_decl var_type =
+          let rec array_dims var_type dims =
             (match var_type with
-              | Ast.TEXPR_Array {sub; dim=None; _} -> translate_array_decl sub
               | Ast.TEXPR_Array {sub; dim=Some dim; _} ->
-                  let arr = allocate_register () in
                   let current_bb, len = translate_expression env current_bb dim in
-                  append_instruction current_bb @@ I_NewArray (arr, len);
-                  translate_array_decl sub
-              | _ -> ()
+                  array_dims sub (len :: dims)
+              | Ast.TEXPR_Array {sub; dim=None; _} -> array_dims sub dims
+              | _ -> dims
             )
-          in
-          translate_array_decl (get_var_type var);
+          in let dims = array_dims (get_var_type var) [] in
+          let xs = allocate_register() in
+          let bb_cond = allocate_block() in
+          let bb_body = allocate_block() in
+          let bb_after = allocate_block() in
+          let dims = (match dims with
+            | [] -> []
+            | dim :: dims ->
+                append_instruction current_bb @@ I_NewArray (xs, dim);
+                dims
+          )
+          in let rec allocate_mem xs bb_pre bb_cond bb_body bb_after dims =
+            (match dims with
+              | [] -> ()
+              | dim :: dims ->
+                  let iter = allocate_register () in
+                  append_instruction bb_pre @@ I_Move (iter, E_Int i32_0);
+                  set_jump bb_pre bb_cond;
+                  set_branch COND_Ne (E_Reg iter) dim bb_cond bb_body bb_after;
+                  let ri = allocate_register () in
+                  append_instruction bb_body @@ I_NewArray (ri, dim);
+                  append_instruction bb_body @@ I_StoreArray (E_Reg xs, E_Reg iter, E_Reg ri);
+                  append_instruction bb_body @@ I_Add (iter, E_Reg iter, E_Int i32_1);
+                  set_jump bb_body bb_cond;
+                  let bb_nested_cond = allocate_block () in
+                  let bb_nested_body = allocate_block () in
+                  allocate_mem ri bb_body bb_nested_cond bb_nested_body bb_cond dims;
+            )
+          in allocate_mem xs current_bb bb_cond bb_body bb_after dims;
           (match init with
             | Some init ->
                 let current_bb, init_res = translate_expression env current_bb init in
-                let ext_env, var_reg = bind_var_declaration env var in
-                append_instruction current_bb @@ I_Move (var_reg, init_res);
+                (* let env = Environment.add_var (Ast.identifier_of_var_declaration vardecl) r env in *)
+                let ext_env = Environment.add_var (Ast.identifier_of_var_declaration var) xs env in
+                append_instruction current_bb @@ I_Move (xs, init_res);
                 ext_env, current_bb
             | None ->
-                let ext_env, var_reg = bind_var_declaration env var in
-                ext_env, current_bb
+                let ext_env = Environment.add_var (Ast.identifier_of_var_declaration var) xs env in
+                ext_env, bb_after
           )
 
       | Ast.STMT_If { cond; then_branch; else_branch; _} ->
@@ -385,6 +408,7 @@ module Make() = struct
 
       | Ast.STMT_MultiVarDecl {vars; init; _} ->
           (* TODO: Refactor this fold_left *)
+          (* TODO: any issues with arrays? *)
           let res_count = List.length vars in
           let bb', init_regs = translate_call env current_bb res_count init in
           let bb', env' = List.fold_left2 (
@@ -400,9 +424,7 @@ module Make() = struct
           in env', bb'
 
     and translate_block env current_bb (Ast.STMTBlock {body; _}) =
-        let env', res_bb = List.fold_left
-          (uncurry translate_statement) (env, current_bb) body
-        in env', res_bb
+        List.fold_left (uncurry translate_statement) (env, current_bb) body
 
     and bind_var_declaration env vardecl =
       let r = allocate_register () in
