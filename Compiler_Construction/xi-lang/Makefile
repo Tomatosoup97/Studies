@@ -17,10 +17,10 @@ install: all
 	ln -s ${BUILD_PATH_XI} ./xi
 
 test: all
-	python3 ./tools/tester.py --plugin mods/mod_student.cma
+	python3 ./tools/tester.py --plugin mods/mod_student.cma # --registers-description=simple_caller
 
 test_without_plugin: all
-	python3 ./tools/tester.py 
+	python3 ./tools/tester.py # --registers-description=simple_caller
 
 clean:
 	rm -f ./xi

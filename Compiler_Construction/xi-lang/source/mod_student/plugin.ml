@@ -27,14 +27,21 @@ module Plugin : PLUGIN = struct
 
   let make_spill_costs_analysis = None
 
-  (* Set to None to use built-in lexer and parser *)
+  let lexer_and_parser = None
+
+  (*
   let lexer_and_parser = Some (module LexerAndParser : LEXER_AND_PARSER)
+   *)
 
-  (* Set to None to use built-in typechecker *)
-  (* let make_typechecker = Some (module Typechecker.Make : MAKE_TYPECHECKER) *)
   let make_typechecker = None
+  (*
+  let make_typechecker = Some (module Typechecker.Make : MAKE_TYPECHECKER)
+   *)
 
+  let make_translator = None
+  (*
   let make_translator = Some (module Translator.Make : MAKE_TRANSLATOR)
+  *)
 
   let make_jump_threading = None
 
@@ -46,7 +53,9 @@ module Plugin : PLUGIN = struct
 
   let make_mipslower = None
 
-  let make_register_allocator = None
+  let make_register_allocator = Some (module Regalloc.Make : MAKE_REGISTER_ALLOCATOR)
+
+  let make_register_coalescing = None
 
   let make_constant_folding_analysis = None
 

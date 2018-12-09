@@ -95,6 +95,13 @@ module Getters = struct
     | Some x -> Some (name, Plugin.version, x)
     | None -> None
 
+  let make_register_coalescing (name, plugin) =
+    let module Plugin = (val plugin : Plugin.PLUGIN) in
+    match Plugin.make_register_coalescing with
+    | Some x -> Some (name, Plugin.version, x)
+    | None -> None
+
+
   let make_dead_code_elimination (name, plugin) =
     let module Plugin = (val plugin : Plugin.PLUGIN) in
     match Plugin.make_dead_code_elimination with
@@ -169,6 +176,8 @@ module Resolver = struct
 
   let make_register_allocator = find_module "MakeRegisterAllocator" Getters.make_register_allocator
 
+  let make_register_coalescing = find_module "MakeRegisterCoalescing" Getters.make_register_coalescing
+
   let make_dead_code_elimination = find_module "MakeDeadCodeElimination" Getters.make_dead_code_elimination
 
   let make_codegen = find_module "MakeCodegen" Getters.make_codegen
@@ -191,6 +200,7 @@ let resolve_compiler_toolbox regdescr =
   let module MakeInterferenceGraphAnalysis = (val Resolver.make_interference_graph_analysis !register) in
   let module MakeSpilling = (val Resolver.make_spilling !register) in
   let module MakeReachabilityAnalysis = (val Resolver.make_reachability_analysis !register) in
+  let module MakeRegisterCoalescing = (val Resolver.make_register_coalescing !register) in
   let module M = struct
     module LiveVariablesAnalysis = MakeLiveVariablesAnalysis()
     module DominatorsAnalysis = MakeDominatorsAnalysis()
@@ -202,6 +212,7 @@ let resolve_compiler_toolbox regdescr =
     module InterferenceGraphAnalysis = MakeInterferenceGraphAnalysis()
     module Spilling = MakeSpilling()
     module ReachabilityAnalysis = MakeReachabilityAnalysis()
+    module RegisterCoalescing = MakeRegisterCoalescing()
   end in
   (module M : Iface.COMPILER_TOOLBOX)
 

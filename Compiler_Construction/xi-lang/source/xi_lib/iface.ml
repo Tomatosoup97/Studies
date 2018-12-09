@@ -64,6 +64,12 @@ module type CALLCONV = sig
 
 end
 
+module type REGISTER_COALESCING = sig
+
+  val coalesce: Ir.procedure -> Ir.RegGraph.t -> Ir.reg list -> bool
+
+end
+
 module type REGISTER_ALLOCATOR = sig
 
   val regalloc: Ir.procedure -> register_mapping
@@ -168,6 +174,8 @@ module type COMPILER_TOOLBOX = sig
   module Spilling : SPILLING
 
   module ReachabilityAnalysis : REACHABILITY_ANALYSIS
+
+  module RegisterCoalescing: REGISTER_COALESCING
 end
 
 

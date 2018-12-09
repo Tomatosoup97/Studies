@@ -39,6 +39,9 @@ module type MAKE_MIPS_LOWER = functor (T:COMPILER_TOOLBOX) -> MIPS_LOWER
 
 module type MAKE_SPILLING = functor () -> SPILLING
 
+module type MAKE_REGISTER_COALESCING = functor () -> REGISTER_COALESCING
+
+
 module type PLUGIN = sig
 
   val version: string
@@ -82,4 +85,6 @@ module type PLUGIN = sig
   val make_spilling: (module MAKE_SPILLING) option
 
   val make_reachability_analysis: (module MAKE_REACHABILITY_ANALYSIS) option
+
+  val make_register_coalescing: (module MAKE_REGISTER_COALESCING ) option
 end
