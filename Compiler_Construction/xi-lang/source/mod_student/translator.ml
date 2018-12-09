@@ -328,7 +328,7 @@ module Make() = struct
                 append_instruction current_bb @@ I_NewArray (xs, dim);
                 dims
           )
-          in let rec allocate_mem xs bb_pre bb_cond bb_body bb_after dims =
+          in let rec allocate_mem xs bb_pre bb_cond bb_body bb_after dims : unit =
             (match dims with
               | [] -> ()
               | dim :: dims ->
@@ -343,8 +343,8 @@ module Make() = struct
                   set_jump bb_body bb_cond;
                   let bb_nested_cond = allocate_block () in
                   let bb_nested_body = allocate_block () in
-                  allocate_mem ri bb_body bb_nested_cond bb_nested_body bb_cond dims;
-            )
+                  allocate_mem ri bb_body bb_nested_cond bb_nested_body bb_cond dims
+            );
           in allocate_mem xs current_bb bb_cond bb_body bb_after dims;
           (match init with
             | Some init ->
@@ -363,10 +363,10 @@ module Make() = struct
           let bb_then = translate_condition env current_bb bb_else cond in
           set_jump bb_else bb_merge;
           set_jump bb_then bb_merge;
-          let _, _ = translate_statement env bb_then then_branch in
+          let _ = translate_statement env bb_then then_branch in
           (match else_branch with
             | Some else_branch ->
-                let _, _ = translate_statement env bb_else else_branch in ()
+                let _ = translate_statement env bb_else else_branch in ()
             | None -> ()
           );
           env, bb_merge
