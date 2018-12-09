@@ -154,11 +154,11 @@ module Make() = struct
           let str_reg = allocate_register () in
           let str_len = Int32.of_int (String.length value) in
           append_instruction current_bb @@ I_NewArray (str_reg, E_Int str_len);
-          String.iteri (fun i -> fun c ->
+          String.iteri (fun i c ->
             append_instruction current_bb @@ I_StoreArray
-            (E_Reg str_reg,
-             E_Int (Int32.of_int i),
-             E_Int (Int32.of_int @@ Char.code c));
+              (E_Reg str_reg,
+               E_Int (Int32.of_int i),
+               E_Int (Int32.of_int @@ Char.code c));
           ) value;
           current_bb, E_Reg str_reg
 
@@ -187,47 +187,45 @@ module Make() = struct
 
       | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_Add; tag; _} ->
           let res_reg = allocate_register () in
-          let current_bb, lhs_res = translate_expression env current_bb lhs in
-          let current_bb, rhs_res = translate_expression env current_bb rhs in
+          let bb', lhs_res = translate_expression env current_bb lhs in
+          let bb'', rhs_res = translate_expression env bb' rhs in
           (match Hashtbl.find node2type tag with
-            | TP_Int -> append_instruction current_bb @@
-                        I_Add (res_reg, lhs_res, rhs_res)
-            | TP_Array t -> append_instruction current_bb @@
-                            I_Concat (res_reg, lhs_res, rhs_res)
-            | _ -> typechecker_error ()
+            | TP_Int      -> append_instruction bb'' @@
+                             I_Add (res_reg, lhs_res, rhs_res)
+            | TP_Array t  -> append_instruction bb'' @@
+                             I_Concat (res_reg, lhs_res, rhs_res)
+            | _           -> typechecker_error ()
           );
-          current_bb, E_Reg res_reg
+          bb'', E_Reg res_reg
 
       | Ast.EXPR_Binop {lhs; rhs; op; _} ->
           let res_reg = allocate_register () in
-          let current_bb, lhs_res = translate_expression env current_bb lhs in
-          let current_bb, rhs_res = translate_expression env current_bb rhs in
-          append_instruction current_bb @@ binop_instr res_reg lhs_res rhs_res op;
-          current_bb, E_Reg res_reg
+          let bb', lhs_res = translate_expression env current_bb lhs in
+          let bb'', rhs_res = translate_expression env bb' rhs in
+          append_instruction bb'' @@ binop_instr res_reg lhs_res rhs_res op;
+          bb'', E_Reg res_reg
 
       | Ast.EXPR_Unop {op; sub; _} ->
           let res_reg = allocate_register () in
-          let current_bb, sub_res = translate_expression env current_bb sub in
-          append_instruction current_bb @@ unop_instr res_reg sub_res op;
-          current_bb, E_Reg res_reg
+          let bb', sub_res = translate_expression env current_bb sub in
+          append_instruction bb' @@ unop_instr res_reg sub_res op;
+          bb', E_Reg res_reg
 
       | Ast.EXPR_Index {expr; index; _} ->
           let res_reg = allocate_register () in
-          let current_bb, xs = translate_expression env current_bb expr in
-          let current_bb, index = translate_expression env current_bb index in
-          append_instruction current_bb @@ I_LoadArray (res_reg, xs, index);
-          current_bb, E_Reg res_reg
+          let bb', xs = translate_expression env current_bb expr in
+          let bb'', index = translate_expression env bb' index in
+          append_instruction bb'' @@ I_LoadArray (res_reg, xs, index);
+          bb'', E_Reg res_reg
 
       | Ast.EXPR_Struct {elements; _} ->
           let res_reg = allocate_register () in
           let struct_len = Int32.of_int (List.length elements) in
           append_instruction current_bb @@ I_NewArray (res_reg, E_Int struct_len);
-          List.iteri (fun i -> fun elem ->
+          List.iteri (fun i elem ->
             let bb', res = translate_expression env current_bb elem in
-            append_instruction current_bb @@ I_StoreArray
-            (E_Reg res_reg,
-             E_Int (Int32.of_int i),
-             res);
+            append_instruction bb' @@ I_StoreArray
+              (E_Reg res_reg, E_Int (Int32.of_int i), res);
           ) elements;
           current_bb, E_Reg res_reg
 
@@ -263,34 +261,27 @@ module Make() = struct
         allocate_block ()
 
       | Ast.EXPR_Relation {lhs; op; rhs; _} ->
-          (* TODO: I don't trust this yet *)
           let bb, lhs_res = translate_expression env current_bb lhs in
           let bb', rhs_res = translate_expression env bb rhs in
           let bb_then = allocate_block () in
           set_branch (relop_instr op) lhs_res rhs_res bb' bb_then else_bb;
           bb_then
 
-      | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_Or; _} ->
-          (* TODO: does it make sense? *)
-          (* TODO: are bb_l and bb_right_then necessary? *)
-          (* This seems like it works *)
-          let bb_after = allocate_block () in
+      | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_Or as op; _}
+      | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_And as op; _} ->
           let bb_right = allocate_block () in
-          let bb_l, lhs_res = translate_expression env current_bb lhs in
-          set_branch COND_Eq lhs_res (E_Int i32_1) bb_l bb_after bb_right;
-          let bb_right_then, rhs_res = translate_expression env bb_right rhs in
-          set_branch COND_Eq rhs_res (E_Int i32_1) bb_right_then bb_after else_bb;
-          bb_after
-
-      | Ast.EXPR_Binop {lhs; rhs; op=Ast.BINOP_And; _} ->
-          (* TODO: does it make sense? *)
-          (* TODO: are bb_l and bb_right_then necessary? *)
-          let bb_right = allocate_block () in
-          let bb_l, lhs_res = translate_expression env current_bb lhs in
-          set_branch COND_Ne lhs_res (E_Int i32_0) bb_l bb_right else_bb;
-          let bb_right_then, rhs_res = translate_expression env bb_right rhs in
           let bb_after = allocate_block () in
-          set_branch COND_Ne rhs_res (E_Int i32_0) bb_right_then bb_after else_bb;
+          let bb_l, lhs_res = translate_expression env current_bb lhs in
+          let bb_right_then, rhs_res = translate_expression env bb_right rhs in
+          (match op with
+            | Ast.BINOP_Or ->
+                set_branch COND_Eq lhs_res (E_Int i32_1) bb_l bb_after bb_right;
+                set_branch COND_Eq rhs_res (E_Int i32_1) bb_right_then bb_after else_bb;
+            | Ast.BINOP_And ->
+                set_branch COND_Ne lhs_res (E_Int i32_0) bb_l bb_right else_bb;
+                set_branch COND_Ne rhs_res (E_Int i32_0) bb_right_then bb_after else_bb;
+            | _ -> typechecker_error ()
+          );
           bb_after
 
       | e ->
@@ -358,7 +349,6 @@ module Make() = struct
           (match init with
             | Some init ->
                 let current_bb, init_res = translate_expression env current_bb init in
-                (* let env = Environment.add_var (Ast.identifier_of_var_declaration vardecl) r env in *)
                 let ext_env = Environment.add_var (Ast.identifier_of_var_declaration var) xs env in
                 append_instruction current_bb @@ I_Move (xs, init_res);
                 ext_env, current_bb
@@ -373,7 +363,7 @@ module Make() = struct
           let bb_then = translate_condition env current_bb bb_else cond in
           set_jump bb_else bb_merge;
           set_jump bb_then bb_merge;
-          let _, bb_then = translate_statement env bb_then then_branch in
+          let _, _ = translate_statement env bb_then then_branch in
           (match else_branch with
             | Some else_branch ->
                 let _, _ = translate_statement env bb_else else_branch in ()
@@ -385,11 +375,11 @@ module Make() = struct
           translate_block env current_bb body
 
       | Ast.STMT_Return {values; _} ->
-          let transl_values (current_bb, xs) value =
+          let transl_value (current_bb, xs) value =
             let current_bb', x = translate_expression env current_bb value in
             (current_bb', xs @ [x])
           in
-          let current_bb, results = List.fold_left transl_values (current_bb, []) values in
+          let current_bb, results = List.fold_left transl_value (current_bb, []) values in
           set_return current_bb results;
           env, current_bb
 
@@ -407,21 +397,17 @@ module Make() = struct
           env, bb_after
 
       | Ast.STMT_MultiVarDecl {vars; init; _} ->
-          (* TODO: Refactor this fold_left *)
-          (* TODO: any issues with arrays? *)
           let res_count = List.length vars in
           let bb', init_regs = translate_call env current_bb res_count init in
-          let bb', env' = List.fold_left2 (
-            fun (bb, env as acc) -> fun init_reg -> fun vardecl ->
-              (match vardecl with
-                | Some vardecl ->
-                  let env', var_reg = bind_var_declaration env vardecl in
-                  append_instruction bb @@ I_Move (var_reg, E_Reg init_reg);
-                  bb, env'
-                | None -> acc
-              )
-            ) (current_bb, env) init_regs vars
-          in env', bb'
+          List.fold_left2 (fun (env, bb as acc) init_reg vardecl ->
+            (match vardecl with
+              | Some vardecl ->
+                let env', var_reg = bind_var_declaration env vardecl in
+                append_instruction bb @@ I_Move (var_reg, E_Reg init_reg);
+                env', bb
+              | None -> acc
+            )
+          ) (env, current_bb) init_regs vars
 
     and translate_block env current_bb (Ast.STMTBlock {body; _}) =
         List.fold_left (uncurry translate_statement) (env, current_bb) body
@@ -459,7 +445,6 @@ module Make() = struct
       let i = !counter in
       incr counter;
       REG_Tmp i
-
 
     let translate_global_definition node2type env gdef =
       let cfg = ControlFlowGraph.create () in
