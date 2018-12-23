@@ -1,12 +1,12 @@
 #!/bin/sh
-make
 TEST_NAME="$1"
+make && \
+echo "----------  uwr  ----------" && \
+./xi --extra-debug $TEST_NAME > /dev/null 2>&1 && \
+rm uwr_xilog -rf && \
+cp -r xilog uwr_xilog && \
 echo "----------  out  ----------" && \
-./xi --plugin mods/mod_student.cma $TEST_NAME && \
-echo "----------  log  -----------" && \
-cat "xilog/005.translate.log" && \
-echo "----------  ir   ----------" && \
-cat "xilog/006.translate.translated.ir" && \
+./xi --extra-debug --plugin mods/mod_student.cma $TEST_NAME && \
 echo "----------  test ----------" && \
 cat -n $TEST_NAME && \
 echo "" && \
