@@ -1,3 +1,4 @@
+(* vim: set softtabstop=2 sw=2: *)
 open Xi_lib
 open Xi_lib.Measure
 open Ir
@@ -15,27 +16,25 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
 
     module Coalescencing = Toolbox.RegisterCoalescing
 
-    (* Dostępne rejestry *)
     let available_registers = Toolbox.RegistersDescription.available_registers
 
-    (* Liczba dostępnych kolorów *)
     let number_of_available_registers = List.length available_registers
 
     (* ------------------------------------------------------------------------
-     *  Hashtablice z kolorami 
+     *  Hashtable with colors
      *)
 
     (* wstępnie pokolorowane wierzchołki *)
     let base_register2color_assignment : (reg, int) Hashtbl.t = Hashtbl.create 13
 
-    (* kolory wierzchołków *)
+    (* vertexes coloring *)
     let register2color_assignment : (reg, int) Hashtbl.t = Hashtbl.create 13
 
     (* pomocnicza tablica -- odwzorowuje kolor na rejestr sprzętowy *)
     let color2register_assignment : (int, reg) Hashtbl.t = Hashtbl.create 13
 
     (* ------------------------------------------------------------------------
-     *  Wstępne kolorowanie
+     *  Initial coloring
      *)
 
     let initialize_colors () =
@@ -46,13 +45,13 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
       List.iteri color available_registers
 
     (* ------------------------------------------------------------------------
-     *  Budowanie grafu interferencji 
+     *  Interference graph building
      *)
 
     let build_infg () =
       logf "building interference graph";
       let lva = Toolbox.LiveVariablesAnalysis.analyse cfg in
-      Logger.extra_debug begin fun () -> 
+      Logger.extra_debug begin fun () ->
         Logger.dump_live_variables "before-inf-build" cfg lva;
       end;
       let infg = Toolbox.InterferenceGraphAnalysis.analyse cfg lva in
@@ -65,8 +64,8 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
      *  Pomocnicze funkcje
      *)
 
-    let loop name f = 
-      let rec iter i = 
+    let loop name f =
+      let rec iter i =
         logf "Starting iteration %s %u" name i;
         let r, should_restart = measure "iteration" f in
         if should_restart then
@@ -98,27 +97,70 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
       end;
       spill_costs
 
-    let spill actual_spills = 
+    let spill actual_spills =
       measure "spill" (fun () -> Toolbox.Spilling.spill proc actual_spills);
       actual_spills <> []
 
     (* ------------------------------------------------------------------------
-     * Faza simplify
+     * Simplify phase
      *)
 
+    let graph_vertexes_list g = RegGraph.fold_vertex List.cons g []
 
-    let simplify =
-      failwith "not yet implemented"
+    let min_in_graph infg compare =
+        match graph_vertexes_list infg with
+          | [] -> None
+          | v :: vs ->
+            let rec aux v_min = function
+              | [] -> Some v_min
+              | v :: vs ->
+                if compare infg v v_min
+                then aux v vs
+                else aux v_min vs
+            in aux v vs
+
+    let select_spill_candidate infg scosts =
+        let calc_ratio v cost = (cost / RegGraph.out_degree infg v) in
+        let vs = graph_vertexes_list infg in
+        let compare_costs infg v1 v2 =
+          let c1, c2 = Hashtbl.find scosts v1, Hashtbl.find scosts v2 in
+          calc_ratio v1 c1 < calc_ratio v2 c2
+        in
+        match min_in_graph infg compare_costs with
+          | Some v -> v
+          | None -> failwith "No available candidates for spill!"
+
+    let simplify scosts infg =
+        let nodes = Stack.create () in
+        let compare_degrees infg v1 v2 =
+          RegGraph.out_degree infg v1 < RegGraph.out_degree infg v2
+        in
+        let rec simplify_loop = fun () ->
+          match graph_vertexes_list infg, min_in_graph infg compare_degrees with
+            | _ :: _, Some (REG_Tmp _ as min_v)  ->
+              if (RegGraph.out_degree infg min_v) < number_of_available_registers
+              then (
+                Stack.push min_v nodes;
+                RegGraph.remove_vertex infg min_v;
+                simplify_loop ()
+              )
+              else (
+                let min_v = select_spill_candidate infg scosts in
+                Stack.push min_v nodes;
+                RegGraph.remove_vertex infg min_v;
+                simplify_loop ()
+              )
+            | _, _ -> nodes
+        in simplify_loop ()
 
     (* ------------------------------------------------------------------------
-     *  Faza Select
+     *  Select phase
      *)
 
-    let select = 
-      failwith "not yet implemented"
+    let select = failwith "select not yet implemented"
 
     (* ------------------------------------------------------------------------
-     *  Pętla build-coalesce
+     *  build-coalesce loop
      *)
 
     let build_coalescence () =
@@ -126,11 +168,11 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
       let changed = measure "coalescence" (fun () ->  Coalescencing.coalesce proc infg available_registers) in
       infg, changed
 
-    let build_coalescence_loop () = 
+    let build_coalescence_loop () =
       loop "build-coalescence" build_coalescence
 
     (* ------------------------------------------------------------------------
-     *  Pętla build-coalesce
+     *  Single pass
      *)
 
     let single_pass () =
@@ -146,6 +188,7 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
       let infg = measure "build-coalescence " build_coalescence_loop in
       let spill_costs = measure "spillcosts" (fun () -> compute_spill_costs infg) in
       (* uruchom fazę simplify/select/spill *)
+      let simplify_stack = simplify spill_costs infg in
 
       (* unit na potrzeby interfejsu pomocniczej funkcji loop *)
       (), true
@@ -155,8 +198,8 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
      *)
 
     let build_register_assignment () =
-      let register_assignment : (reg, reg) Hashtbl.t = Hashtbl.create 513 in 
-      failwith "not yet implemented";
+      let register_assignment : (reg, reg) Hashtbl.t = Hashtbl.create 513 in
+      failwith "build_register_assignment not yet implemented";
       (* Przejdz tablice register2color_assignment i uzupełnij prawidłowo
        * tablicę register_assignment *)
       register_assignment
@@ -173,7 +216,7 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
 
   end
 
-  let regalloc proc = 
+  let regalloc proc =
     let module Instance = Implementation(struct
       let cfg = cfg_of_procedure proc
       let proc = proc
