@@ -4,6 +4,7 @@ open Xi_lib.Measure
 open Ir
 
 let logf fmt = Logger.make_logf __MODULE__ fmt
+let uncurry f (a, b) = f a b
 
 module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
 
@@ -110,14 +111,6 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
      * Simplify phase
      *)
 
-    let vertex_neighbours infg v =
-      let add_nb w1 w2 acc =
-        if      w1 == v then w1 :: acc
-        else if w2 == v then w2 :: acc
-        else            acc
-      in
-      RegGraph.fold_edges add_nb infg []
-
     let graph_vertexes_list g = RegGraph.fold_vertex List.cons g []
 
     let reg_deg infg = function
@@ -156,15 +149,16 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
             | v :: vs, Some (REG_Tmp _ as min_v)  ->
               let min_v_deg = RegGraph.out_degree infg min_v in
               log_str_list ["Stacking register"; (Ir_utils.string_of_reg min_v); "of degree"; (string_of_int min_v_deg)];
+              let v_neighbours = RegGraph.succ infg min_v in
               if min_v_deg < number_of_available_registers
               then (
-                Stack.push min_v nodes;
+                Stack.push (min_v, v_neighbours) nodes;
                 RegGraph.remove_vertex infg min_v;
                 simplify_loop ()
               )
               else (
                 let min_v = select_spill_candidate infg scosts in
-                Stack.push min_v nodes;
+                Stack.push (min_v, v_neighbours) nodes;
                 RegGraph.remove_vertex infg min_v;
                 simplify_loop ()
               )
@@ -185,16 +179,15 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
         let rec aux prev = (function
           | [] -> prev + 1
           | x :: xs -> if x == (prev + 1) then aux x xs else prev + 1)
-        in aux x xs
+        in if x == 0 then aux x xs else 0
 
-    let select_color infg v =
-      let nbs = vertex_neighbours infg v in
+    let select_color infg v v_nbs =
       log_str_list ["Picking color for"; Ir_utils.string_of_reg v];
       let get_color v = Hashtbl.find register2color_assignment v in
-      let ncolors = List.sort compare (List.map get_color nbs) in
+      let ncolors = List.sort compare (List.map get_color v_nbs) in
       log_str_list (["Neighbours have colors:"] @ List.map string_of_int ncolors);
       let color = fst_seq_num ncolors in
-      log_str_list ["Picking color:"; string_of_int color];
+      log_str_list ["Selected color:"; string_of_int color];
       Hashtbl.add register2color_assignment v color;
       color
 
@@ -203,12 +196,14 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
       let rec aux actual_spills =
         if Stack.is_empty potential_spills
         then (
-          logf "No more potential spills";
+          log_str_list (["Actual spills: ["] @ (List.map Ir_utils.string_of_reg actual_spills) @ ["]"]);
           actual_spills
         ) else
-          let v = Stack.pop potential_spills in
-          RegGraph.add_vertex infg v;  (* restore vertex *)
-          if select_color infg v >= number_of_available_registers (* TODO: GT or GTE? *)
+          let v, v_nbs = Stack.pop potential_spills in
+          log_str_list (["Neighbours: ["] @ (List.map Ir_utils.string_of_reg v_nbs) @ ["]"]);
+          RegGraph.add_vertex infg v;
+          List.iter (RegGraph.add_edge infg v) v_nbs;
+          if select_color infg v v_nbs >= number_of_available_registers
           then (
             log_str_list ["Actual spill of register"; Ir_utils.string_of_reg v];
             aux (actual_spills @ [v])
