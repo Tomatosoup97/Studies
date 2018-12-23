@@ -4,7 +4,6 @@ open Xi_lib.Measure
 open Ir
 
 let logf fmt = Logger.make_logf __MODULE__ fmt
-let uncurry f (a, b) = f a b
 
 module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
 
@@ -70,6 +69,9 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
         logf "%s" (String.concat " " xs)
       end
 
+    let log_regs_list xs title =
+      log_str_list ([title; ": ["] @ (List.map Ir_utils.string_of_reg xs) @ ["]"])
+
     let loop name f =
       let rec iter i =
         logf "Starting iteration %s %u" name i;
@@ -129,40 +131,56 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
                 else aux v_min vs
             in aux v vs
 
+    let calc_ratio infg scosts v =
+      let cost = Hashtbl.find scosts v in
+      float_of_int cost /. float_of_int (RegGraph.out_degree infg v)
+
+    let cmp_regs_vals f r1 r2 =
+      match f r1 = f r2, r1, r2 with
+        | true, REG_Tmp i1, REG_Tmp i2 -> i1 < i2
+        | _ -> f r1 < f r2
+
     let select_spill_candidate infg scosts =
-        let calc_ratio v cost = (cost / RegGraph.out_degree infg v) in
         let vs = graph_vertexes_list infg in
         let compare_costs infg v1 v2 =
-          let c1, c2 = Hashtbl.find scosts v1, Hashtbl.find scosts v2 in
-          calc_ratio v1 c1 < calc_ratio v2 c2
+          cmp_regs_vals (calc_ratio infg scosts) v1 v2
         in
         match min_in_graph infg compare_costs with
           | Some v -> v
           | None -> failwith "No available candidates for spill!"
 
     let simplify scosts infg =
+        let d_infg = fun () ->
+          let _ = RegGraph.fold_vertex
+            (fun v acc -> (log_regs_list (RegGraph.succ infg v) (Ir_utils.string_of_reg v)); acc)
+            infg []
+          in ()
+        in
         logf "Run simplify";
         let nodes = Stack.create () in
-        let compare_degrees infg v1 v2 = reg_deg infg v1 < reg_deg infg v2 in
+        let compare_degrees infg v1 v2 = cmp_regs_vals (reg_deg infg) v1 v2 in
         let rec simplify_loop = fun () ->
-          match graph_vertexes_list infg, min_in_graph infg compare_degrees with
-            | v :: vs, Some (REG_Tmp _ as min_v)  ->
-              let min_v_deg = RegGraph.out_degree infg min_v in
-              log_str_list ["Stacking register"; (Ir_utils.string_of_reg min_v); "of degree"; (string_of_int min_v_deg)];
+          match min_in_graph infg compare_degrees with
+            | Some (REG_Tmp i as min_v)  ->
               let v_neighbours = RegGraph.succ infg min_v in
+              let min_v_deg = RegGraph.out_degree infg min_v in
               if min_v_deg < number_of_available_registers
               then (
+                log_str_list ["Stacking register"; Ir_utils.string_of_reg min_v; "of degree"; string_of_int min_v_deg];
                 Stack.push (min_v, v_neighbours) nodes;
                 RegGraph.remove_vertex infg min_v;
                 simplify_loop ()
               )
               else (
-                let min_v = select_spill_candidate infg scosts in
-                Stack.push (min_v, v_neighbours) nodes;
-                RegGraph.remove_vertex infg min_v;
+                let spill_candidate = select_spill_candidate infg scosts in
+                let v_neighbours = RegGraph.succ infg spill_candidate in
+                log_str_list (["Local spill costs:"] @ (RegGraph.fold_vertex (fun v acc -> (String.concat ":" [Ir_utils.string_of_reg v; string_of_float (calc_ratio infg scosts v); string_of_int (RegGraph.out_degree infg v)]) :: acc) infg []));
+                log_str_list ["Potential spill"; (Ir_utils.string_of_reg spill_candidate); "of degree"; (string_of_int (RegGraph.out_degree infg spill_candidate))];
+                Stack.push (spill_candidate, v_neighbours) nodes;
+                RegGraph.remove_vertex infg spill_candidate;
                 simplify_loop ()
               )
-            | _, _ ->
+            | _ ->
                 logf "No more temporary registers in interference-graph";
                 nodes
         in simplify_loop ()
@@ -178,7 +196,7 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
       | x :: xs ->
         let rec aux prev = (function
           | [] -> prev + 1
-          | x :: xs -> if x == (prev + 1) then aux x xs else prev + 1)
+          | x :: xs -> if x <= (prev + 1) then aux x xs else prev + 1)
         in if x == 0 then aux x xs else 0
 
     let select_color infg v v_nbs =
@@ -187,7 +205,7 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
       let ncolors = List.sort compare (List.map get_color v_nbs) in
       log_str_list (["Neighbours have colors:"] @ List.map string_of_int ncolors);
       let color = fst_seq_num ncolors in
-      log_str_list ["Selected color:"; string_of_int color];
+      log_str_list ["Selected color is"; string_of_int color];
       Hashtbl.add register2color_assignment v color;
       color
 
@@ -196,16 +214,16 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
       let rec aux actual_spills =
         if Stack.is_empty potential_spills
         then (
-          log_str_list (["Actual spills: ["] @ (List.map Ir_utils.string_of_reg actual_spills) @ ["]"]);
+          log_regs_list actual_spills "Actual spills";
           actual_spills
         ) else
           let v, v_nbs = Stack.pop potential_spills in
-          log_str_list (["Neighbours: ["] @ (List.map Ir_utils.string_of_reg v_nbs) @ ["]"]);
+          (* log_regs_list v_nbs "Neighbours"; *)
           RegGraph.add_vertex infg v;
           List.iter (RegGraph.add_edge infg v) v_nbs;
           if select_color infg v v_nbs >= number_of_available_registers
           then (
-            log_str_list ["Actual spill of register"; Ir_utils.string_of_reg v];
+            log_str_list ["Spilling register"; Ir_utils.string_of_reg v];
             aux (actual_spills @ [v])
           ) else aux actual_spills
       in aux []
@@ -283,3 +301,4 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
     Instance.regalloc ()
 
 end
+
