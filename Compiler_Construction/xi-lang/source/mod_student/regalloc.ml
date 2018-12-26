@@ -218,7 +218,6 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
           actual_spills
         ) else
           let v, v_nbs = Stack.pop potential_spills in
-          (* log_regs_list v_nbs "Neighbours"; *)
           RegGraph.add_vertex infg v;
           List.iter (RegGraph.add_edge infg v) v_nbs;
           if select_color infg v v_nbs >= number_of_available_registers
@@ -247,7 +246,6 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
     let single_pass () =
       logf "Run single_pass";
       let init () = begin
-          (* resetujemy robocze tablice *)
           Hashtbl.reset register2color_assignment;
           Hashtbl.replace_seq register2color_assignment @@ Hashtbl.to_seq base_register2color_assignment;
       end in
@@ -257,7 +255,6 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
       let init = measure "init" init in
       let infg = measure "build-coalescence " build_coalescence_loop in
       let spill_costs = measure "spillcosts" (fun () -> compute_spill_costs infg) in
-      (* uruchom fazę simplify/select/spill *)
       let simplify_stack = simplify spill_costs infg in
       match select simplify_stack infg with
         | [] -> (), false
@@ -270,8 +267,6 @@ module Make(Toolbox:Iface.COMPILER_TOOLBOX) = struct
     let build_register_assignment () =
       logf "Run build_register_assignment";
       let register_assignment : (reg, reg) Hashtbl.t = Hashtbl.create 513 in
-      (* Przejdz tablice register2color_assignment i uzupełnij prawidłowo
-       * tablicę register_assignment *)
       let f reg c =
         let hard_reg = Hashtbl.find color2register_assignment c in
         Hashtbl.add register_assignment reg hard_reg;
