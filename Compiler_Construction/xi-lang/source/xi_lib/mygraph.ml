@@ -144,7 +144,7 @@ module MakeUndirected(V:SElem) = struct
   let iter_edges f g =
     let h v nb =
       let f' w = f w v in
-      Hashset.iter f' nb
+      Hashset.iter f' nb 
     in
     Hashtbl.iter h g.g_neighbours 
 

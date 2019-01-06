@@ -17,7 +17,7 @@ module Plugin : PLUGIN = struct
 
   let version = "na"
 
-  let make_live_variables_analysis = None
+  let make_live_variables_analysis = Some (module Live_variables.Make : MAKE_LIVE_VARIABLES_ANALYSIS)
 
   let make_dominators_analysis = None
 
@@ -53,7 +53,10 @@ module Plugin : PLUGIN = struct
 
   let make_mipslower = None
 
+  (*
   let make_register_allocator = Some (module Regalloc.Make : MAKE_REGISTER_ALLOCATOR)
+   *)
+  let make_register_allocator = None
 
   let make_register_coalescing = None
 

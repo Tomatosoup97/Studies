@@ -75,12 +75,17 @@ end
 
 module LiveVariables = struct
 
+  (* Dziedzina - zbiór rejestrów *)
   type domain = Ir.RegSet.t
 
+  (* Tablica reprezentująca wynik analizy
+   * table odwzorowuje etykietkę (Ir.label) na wiedzę o bloku (BlockKnowledge.t)
+   * *)
   type table = domain Analysis.BlockKnowledge.table
 
   type block_knowledge = domain Analysis.BlockKnowledge.t
 
+  (* Pomocnicza funkcja do drukowania zbioru rejestrów *)
   let string_of_domain x = Ir_utils.string_of_reglist @@ List.of_seq @@ Ir.RegSet.to_seq x
 end
 
