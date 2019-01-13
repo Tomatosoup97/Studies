@@ -13,16 +13,6 @@ module Make() = struct
     module Implementation(M:sig val cfg: ControlFlowGraph.t end) = struct
         open M
 
-        (*
-         * Zwróćmy tablicę gdzie każdy wierzchołek jest zainicjalizowany na
-         * konstruktor Simple (typ BlockKnowledge) gdzie na wejściu/wyjściu
-         * bloku mamy pusty zbiór rejestrów.
-         *
-         * Wierzchołki oznaczające basic-bloki powinny ostatecznie być opisane
-         * konstruktorem Complex, ale początkowo dla wygody możemy ustawić je na Simple.
-         * Ważne aby funkcja przeliczająca wiedzę dla bloku podstawowego ostatecznie
-         * opisał blok za pomocą konstruktora Complex.
-         *)
         let initialize_table () =
             let table = Hashtbl.create 513 in
             let kw = Knowledge.make ~pre:RegSet.empty ~post:RegSet.empty in
@@ -69,10 +59,12 @@ module Make() = struct
         let analyse_cfg_block l =
           (* rtype: bool indicating whether something changed *)
           let blk_kw = Hashtbl.find result l in
-          let succs = ControlFlowGraph.successors cfg l in
-          let succs_pre = List.map (BlockKnowledge.pre <.> Hashtbl.find result) succs in
-          let post_regs = List.fold_left RegSet.union RegSet.empty succs_pre in
           let previous_pre = BlockKnowledge.pre blk_kw in
+          let post_regs =
+            ((List.fold_left RegSet.union RegSet.empty) <.>
+             (List.map (BlockKnowledge.pre <.> Hashtbl.find result))
+            ) (ControlFlowGraph.successors cfg l)
+          in
           let new_blk_kw = transfer_basic_block l blk_kw post_regs in
           Hashtbl.replace result l new_blk_kw;
           (RegSet.compare previous_pre (BlockKnowledge.pre new_blk_kw)) <> 0
@@ -85,8 +77,7 @@ module Make() = struct
             else compute_fixpoint_loop labels
 
         let compute_fixpoint () =
-          let cfg_basic_blocks = ControlFlowGraph.labels cfg in
-          compute_fixpoint_loop cfg_basic_blocks
+          compute_fixpoint_loop (ControlFlowGraph.labels cfg)
 
         let analyse () =
             compute_fixpoint ();
