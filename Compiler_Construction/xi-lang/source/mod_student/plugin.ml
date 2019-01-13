@@ -17,7 +17,10 @@ module Plugin : PLUGIN = struct
 
   let version = "na"
 
+  (*
   let make_live_variables_analysis = Some (module Live_variables.Make : MAKE_LIVE_VARIABLES_ANALYSIS)
+  *)
+  let make_live_variables_analysis = None 
 
   let make_dominators_analysis = None
 
@@ -45,7 +48,6 @@ module Plugin : PLUGIN = struct
 
   let make_jump_threading = None
 
-  let make_constant_folding = None
 
   let make_hilower = None
 
@@ -60,7 +62,9 @@ module Plugin : PLUGIN = struct
 
   let make_register_coalescing = None
 
-  let make_constant_folding_analysis = None
+  let make_constant_folding_analysis = Some (module Constant_folding_analysis.Make : MAKE_CONSTANT_FOLDING_ANALYSIS)
+
+  let make_constant_folding = Some (module Constant_folding.Make : MAKE_CONSTANT_FOLDING)
 
   let make_codegen = None
 

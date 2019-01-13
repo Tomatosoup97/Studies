@@ -1,44 +1,4 @@
 
-module MapWithTop(M:Map.S) = struct
-
-  type 'v t =
-    | Top
-    | Map of 'v M.t
-
-  let equal a b = match a,b with
-    | Top, Top ->
-      true
-    | Top, _
-    | _, Top ->
-      false
-    | Map a, Map b ->
-      M.equal (=) a b
-
-  let less_or_equal a b = match a,b with
-    | _, Top ->
-      true
-
-    | Top, _ ->
-      false
-
-    | Map a, Map b ->
-      let check (k, v) = 
-        match M.find_opt k b with
-        | Some v' -> v = v'
-        | None -> false
-      in
-      let a_items = M.to_seq a in
-      let checks = Seq.map check a_items in
-      Seq.fold_left (&&) true checks
-
-  let greater_or_equal a b = less_or_equal b a
-
-  let unhask dfl = function 
-    | Top -> dfl
-    | Map m -> m
-
-end
-
 module SetWithTop(M:Set.S) = struct
 
   type t =
@@ -97,7 +57,7 @@ end
 
 module ConstantFolding = struct
 
-  type domain = Ir.expr option Ir.RegMap.t
+  type domain = Int32.t option Ir.RegMap.t
 
   type table = domain Analysis.BlockKnowledge.table
 
@@ -105,7 +65,7 @@ module ConstantFolding = struct
 
   let string_of_el = function
     | None -> "T"
-    | Some a -> Ir_utils.string_of_expr a
+    | Some a -> Int32.to_string a
 
   let string_of_domain dom =
     let f (k,v) = Format.sprintf "%s=%s" (Ir_utils.string_of_reg k) (string_of_el v) in
