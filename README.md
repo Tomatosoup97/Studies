@@ -36,3 +36,7 @@ https://github.com/Tomatosoup97/ApplicationSecurity
 - [RIP (Routing Information Protocol)](./Sieci_Komputerowe/router)
     - Implementation of a routing protocol based on distance-vector algorithm
 
+### Data Science
+
+- [Todos](https://github.com/Tomatosoup97/Notebooks)
+
