@@ -1,0 +1,110 @@
+-- vim: set syntax=sql:
+-- 1. Podaj (uporządkowane alfabetycznie, zapisane z polskimi literami i oddzielone przecinkami - bez spacji) nazwiska prowadzących ćwiczenia z Matematyki dyskretnej (M) w semestrze zimowym 2017/2018.
+
+SELECT imie, nazwisko FROM uzytkownik
+JOIN grupa USING (kod_uz)
+JOIN przedmiot_semestr USING (kod_przed_sem)
+JOIN semestr USING (semestr_id)
+JOIN przedmiot USING (kod_przed)
+WHERE przedmiot.nazwa='Matematyka dyskretna (M)'
+AND grupa.rodzaj_zajec='c'
+AND semestr.nazwa LIKE '%zimowy 2017%'
+
+
+-- 2. Podaj imię i nazwisko osoby (oddzielone 1 spacją), która jako pierwsza zapisała się na wykład z Matematyki dyskretnej (M) w semestrze zimowym 2017/2018.
+
+
+SELECT imie,nazwisko,data FROM uzytkownik
+JOIN wybor USING (kod_uz)
+JOIN grupa USING (kod_grupy)
+JOIN przedmiot_semestr USING (kod_przed_sem)
+JOIN semestr USING (semestr_id)
+JOIN przedmiot USING (kod_przed)
+WHERE grupa.rodzaj_zajec='w'
+AND przedmiot.nazwa='Matematyka dyskretna (M)'
+AND semestr.nazwa LIKE '%zimowy 2017%'
+ORDER BY wybor.data
+LIMIT 1;
+
+
+-- 3. Przez ile dni (zaokrągl wynik w górę) studenci zapisywali się na wykład z Matematyki dyskretnej (M) w semestrze zimowym 2017/2018
+
+SELECT b.data - a.data FROM (SELECT uzytkownik.kod_uz,kod_grupy,data FROM uzytkownik
+JOIN wybor USING (kod_uz)
+JOIN grupa USING (kod_grupy)
+JOIN przedmiot_semestr USING (kod_przed_sem)
+JOIN semestr USING (semestr_id)
+JOIN przedmiot USING (kod_przed)
+WHERE grupa.rodzaj_zajec='w'
+AND przedmiot.nazwa='Matematyka dyskretna (M)'
+AND semestr.nazwa LIKE '%zimowy 2017%'
+ORDER BY wybor.data ASC
+LIMIT 1) as a
+JOIN
+(SELECT b.kod_uz,kod_grupy,data FROM uzytkownik b
+JOIN wybor USING (kod_uz)
+JOIN grupa USING (kod_grupy)
+JOIN przedmiot_semestr USING (kod_przed_sem)
+JOIN semestr USING (semestr_id)
+JOIN przedmiot USING (kod_przed)
+WHERE grupa.rodzaj_zajec='w'
+AND przedmiot.nazwa='Matematyka dyskretna (M)'
+AND semestr.nazwa LIKE '%zimowy 2017%'
+ORDER BY wybor.data DESC
+LIMIT 1) as b
+USING (kod_grupy)
+;
+
+-- 4. Do ilu przedmiotów obowiązkowych jest repetytorium?
+
+SELECT DISTINCT COUNT(nazwa) FROM przedmiot
+JOIN przedmiot_semestr USING(kod_przed)
+JOIN grupa USING(kod_przed_sem)
+WHERE przedmiot.rodzaj='o' AND grupa.rodzaj_zajec='e'
+;
+
+-- 5. Ile osób prowadziło ćwiczenia do przedmiotów obowiązkowych w semestrach zimowych? Do odpowiedzi wliczamy sztucznych użytkowników (o “dziwnych” nazwiskach).
+
+SELECT DISTINCT COUNT(kod_uz) FROM uzytkownik
+JOIN grupa USING(kod_uz)
+JOIN przedmiot_semestr USING(kod_przed_sem)
+JOIN przedmiot USING(kod_przed)
+JOIN semestr USING(semestr_id)
+WHERE semestr.nazwa LIKE '%zimowy%'
+AND przedmiot.rodzaj='o'
+AND rodzaj_zajec in ('c', 'C')
+;
+
+
+-- 6. Podaj nazwy wszystkich przedmiotów (w kolejności alfabetycznej, oddzielone przecinkami, a wewnątrz nazw pojedyńczymi spacjami), do których zajęcia prowadził użytkownik o nazwisku Urban.
+
+SELECT DISTINCT przedmiot.nazwa FROM uzytkownik
+JOIN grupa USING(kod_uz)
+JOIN przedmiot_semestr USING(kod_przed_sem)
+JOIN przedmiot USING(kod_przed)
+WHERE nazwisko='Urban'
+AND rodzaj_zajec in ('c', 'C')
+;
+
+
+-- 7. Ile jest w bazie osób o nazwisku Kabacki z dowolnym numerem na końcu?
+
+SELECT COUNT(*) FROM uzytkownik
+WHERE naziwsko LIKE 'Kabacki%'
+;
+
+
+-- 8. Ile osób co najmniej dwukrotnie się zapisało na Algorytmy i struktury danych (M) w różnych semestrach (na dowolne zajęcia)?
+
+
+W którym semestrze (podaj numer) było najmniej przedmiotów obowiązkowych (rozważ tylko semestry, gdy był co najmniej jeden)?
+Ile grup ćwiczeniowych z Logiki dla informatyków  było w semestrze zimowym  2017/2018?
+W którym semestrze (podaj numer) było najwięcej przedmiotów obowiązkowych?
+Ile przedmiotów ma w nazwie dopisek '(ang.)'?
+W jakim okresie (od dnia do dnia) studenci zapisywali się na przedmioty w semestrze zimowym 2016/2017? Podaj odpowiedź w formacie rrrr-mm-dd,rrrr-mm-dd
+Ile przedmiotów typu kurs nie miało edycji w żadnym semestrze (nie występują w tabeli przedmiot_semestr)?
+Ile grup ćwiczenio-pracowni prowadziła P. Kanarek?
+Ile grup z Logiki dla informatyków prowadził W. Charatonik?
+Ile osób uczęszczało dwa razy na Bazy danych?
+Ile osób zapisało sie na jakiś przedmiot w każdym z semestrów zapisanych w bazie?
+
