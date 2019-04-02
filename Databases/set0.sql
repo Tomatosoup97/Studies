@@ -29,29 +29,30 @@ LIMIT 1;
 
 -- 3. Przez ile dni (zaokrągl wynik w górę) studenci zapisywali się na wykład z Matematyki dyskretnej (M) w semestrze zimowym 2017/2018
 
-SELECT b.data - a.data FROM (SELECT uzytkownik.kod_uz,kod_grupy,data FROM uzytkownik
-JOIN wybor USING (kod_uz)
-JOIN grupa USING (kod_grupy)
-JOIN przedmiot_semestr USING (kod_przed_sem)
-JOIN semestr USING (semestr_id)
-JOIN przedmiot USING (kod_przed)
-WHERE grupa.rodzaj_zajec='w'
-AND przedmiot.nazwa='Matematyka dyskretna (M)'
-AND semestr.nazwa LIKE '%zimowy 2017%'
-ORDER BY wybor.data ASC
-LIMIT 1) as a
+SELECT b.data - a.data FROM
+    (SELECT uzytkownik.kod_uz,kod_grupy,data FROM uzytkownik
+        JOIN wybor USING (kod_uz)
+        JOIN grupa USING (kod_grupy)
+        JOIN przedmiot_semestr USING (kod_przed_sem)
+        JOIN semestr USING (semestr_id)
+        JOIN przedmiot USING (kod_przed)
+    WHERE grupa.rodzaj_zajec='w'
+    AND przedmiot.nazwa='Matematyka dyskretna (M)'
+    AND semestr.nazwa LIKE '%zimowy 2017%'
+    ORDER BY wybor.data ASC
+    LIMIT 1) as a
 JOIN
-(SELECT b.kod_uz,kod_grupy,data FROM uzytkownik b
-JOIN wybor USING (kod_uz)
-JOIN grupa USING (kod_grupy)
-JOIN przedmiot_semestr USING (kod_przed_sem)
-JOIN semestr USING (semestr_id)
-JOIN przedmiot USING (kod_przed)
-WHERE grupa.rodzaj_zajec='w'
-AND przedmiot.nazwa='Matematyka dyskretna (M)'
-AND semestr.nazwa LIKE '%zimowy 2017%'
-ORDER BY wybor.data DESC
-LIMIT 1) as b
+    (SELECT b.kod_uz,kod_grupy,data FROM uzytkownik b
+        JOIN wybor USING (kod_uz)
+        JOIN grupa USING (kod_grupy)
+        JOIN przedmiot_semestr USING (kod_przed_sem)
+        JOIN semestr USING (semestr_id)
+        JOIN przedmiot USING (kod_przed)
+    WHERE grupa.rodzaj_zajec='w'
+    AND przedmiot.nazwa='Matematyka dyskretna (M)'
+    AND semestr.nazwa LIKE '%zimowy 2017%'
+    ORDER BY wybor.data DESC
+    LIMIT 1) as b
 USING (kod_grupy)
 ;
 
@@ -90,21 +91,60 @@ AND rodzaj_zajec in ('c', 'C')
 -- 7. Ile jest w bazie osób o nazwisku Kabacki z dowolnym numerem na końcu?
 
 SELECT COUNT(*) FROM uzytkownik
-WHERE naziwsko LIKE 'Kabacki%'
+WHERE nazwisko LIKE 'Kabacki%'
 ;
 
 
 -- 8. Ile osób co najmniej dwukrotnie się zapisało na Algorytmy i struktury danych (M) w różnych semestrach (na dowolne zajęcia)?
 
 
-W którym semestrze (podaj numer) było najmniej przedmiotów obowiązkowych (rozważ tylko semestry, gdy był co najmniej jeden)?
-Ile grup ćwiczeniowych z Logiki dla informatyków  było w semestrze zimowym  2017/2018?
-W którym semestrze (podaj numer) było najwięcej przedmiotów obowiązkowych?
-Ile przedmiotów ma w nazwie dopisek '(ang.)'?
-W jakim okresie (od dnia do dnia) studenci zapisywali się na przedmioty w semestrze zimowym 2016/2017? Podaj odpowiedź w formacie rrrr-mm-dd,rrrr-mm-dd
-Ile przedmiotów typu kurs nie miało edycji w żadnym semestrze (nie występują w tabeli przedmiot_semestr)?
-Ile grup ćwiczenio-pracowni prowadziła P. Kanarek?
-Ile grup z Logiki dla informatyków prowadził W. Charatonik?
-Ile osób uczęszczało dwa razy na Bazy danych?
-Ile osób zapisało sie na jakiś przedmiot w każdym z semestrów zapisanych w bazie?
+
+-- 9. W którym semestrze (podaj numer) było najmniej przedmiotów obowiązkowych (rozważ tylko semestry, gdy był co najmniej jeden)?
+
+SELECT semestr.nazwa, COUNT(kod_przed) as przed_count FROM semestr
+JOIN przedmiot_semestr USING(semestr_id)
+JOIN przedmiot USING(kod_przed)
+WHERE rodzaj='o'
+GROUP BY semestr.nazwa
+ORDER BY przed_count ASC
+LIMIT 1
+;
+
+
+-- 10. Ile grup ćwiczeniowych z Logiki dla informatyków  było w semestrze zimowym  2017/2018?
+
+
+SELECT COUNT(*) FROM grupa
+JOIN przedmiot_semestr USING(kod_przed_sem)
+JOIN przedmiot USING(kod_przed)
+JOIN semestr USING(semestr_id)
+WHERE semestr.nazwa LIKE '%zimowy 2017%'
+AND przedmiot.nazwa LIKE 'Logika dla informatyk%'
+AND rodzaj_zajec in ('c', 'C')
+;
+
+
+-- 11. W którym semestrze (podaj numer) było najwięcej przedmiotów obowiązkowych?
+
+SELECT semestr_id, semestr.nazwa, COUNT(kod_przed_sem) as przed_count FROM semestr
+JOIN przedmiot_semestr USING(semestr_id)
+JOIN przedmiot USING(kod_przed)
+WHERE przedmiot.rodzaj='o'
+GROUP BY semestr_id, semestr.nazwa
+ORDER BY przed_count DESC
+LIMIT 1
+;
+
+-- 12. Ile przedmiotów ma w nazwie dopisek '(ang.)'?
+
+SELECT COUNT(*) FROM przedmiot
+WHERE nazwa LIKE '%(ang.)%'
+;
+
+-- 13. W jakim okresie (od dnia do dnia) studenci zapisywali się na przedmioty w semestrze zimowym 2016/2017? Podaj odpowiedź w formacie rrrr-mm-dd,rrrr-mm-dd
+-- 14. Ile przedmiotów typu kurs nie miało edycji w żadnym semestrze (nie występują w tabeli przedmiot_semestr)?
+-- 15. Ile grup ćwiczenio-pracowni prowadziła P. Kanarek?
+-- 16. Ile grup z Logiki dla informatyków prowadził W. Charatonik?
+-- 17. Ile osób uczęszczało dwa razy na Bazy danych?
+-- 18. Ile osób zapisało sie na jakiś przedmiot w każdym z semestrów zapisanych w bazie?
 
