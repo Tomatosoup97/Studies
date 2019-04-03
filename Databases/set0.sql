@@ -99,7 +99,27 @@ WHERE nazwisko LIKE 'Kabacki%'
 
 -- 8. Ile osób co najmniej dwukrotnie się zapisało na Algorytmy i struktury danych (M) w różnych semestrach (na dowolne zajęcia)?
 
+SELECT COUNT(*) FROM uzytkownik
+WHERE (SELECT COUNT(*) FROM wybor
+    JOIN grupa USING(kod_grupy)
+    JOIN przedmiot_semestr USING(kod_przed_sem)
+    JOIN przedmiot USING(kod_przed)
+    WHERE przedmiot.nazwa='Algorytmy i struktury danych (M)'
+    AND rodzaj_zajec='w'
+    AND wybor.kod_uz=uzytkownik.kod_uz
+)>= 2
+;
 
+SELECT COUNT(*) FROM (SELECT uzytkownik.kod_uz, COUNT(semestr_id) FROM uzytkownik
+    JOIN wybor USING(kod_uz)
+    JOIN grupa USING(kod_grupy)
+    JOIN przedmiot_semestr USING(kod_przed_sem)
+    JOIN przedmiot USING(kod_przed)
+WHERE przedmiot.nazwa='Algorytmy i struktury danych (M)'
+AND rodzaj_zajec='w'
+GROUP BY uzytkownik.kod_uz
+HAVING COUNT(semestr_id) >= 2) as s
+;
 
 -- 9. W którym semestrze (podaj numer) było najmniej przedmiotów obowiązkowych (rozważ tylko semestry, gdy był co najmniej jeden)?
 
@@ -145,6 +165,33 @@ WHERE nazwa LIKE '%(ang.)%'
 
 -- 13. W jakim okresie (od dnia do dnia) studenci zapisywali się na przedmioty w semestrze zimowym 2016/2017? Podaj odpowiedź w formacie rrrr-mm-dd,rrrr-mm-dd
 
+
+SELECT to_char(b.data, 'YYYY-MM-DD'), to_char(a.data, 'YYYY-MM-DD') FROM
+    (SELECT uzytkownik.kod_uz,kod_grupy,data FROM uzytkownik
+        JOIN wybor USING (kod_uz)
+        JOIN grupa USING (kod_grupy)
+        JOIN przedmiot_semestr USING (kod_przed_sem)
+        JOIN semestr USING (semestr_id)
+        JOIN przedmiot USING (kod_przed)
+    WHERE grupa.rodzaj_zajec='w'
+    AND przedmiot.nazwa='Matematyka dyskretna (M)'
+    AND semestr.nazwa LIKE '%zimowy 2017%'
+    ORDER BY wybor.data ASC
+    LIMIT 1) as a
+JOIN
+    (SELECT b.kod_uz,kod_grupy,data FROM uzytkownik b
+        JOIN wybor USING (kod_uz)
+        JOIN grupa USING (kod_grupy)
+        JOIN przedmiot_semestr USING (kod_przed_sem)
+        JOIN semestr USING (semestr_id)
+        JOIN przedmiot USING (kod_przed)
+    WHERE grupa.rodzaj_zajec='w'
+    AND przedmiot.nazwa='Matematyka dyskretna (M)'
+    AND semestr.nazwa LIKE '%zimowy 2017%'
+    ORDER BY wybor.data DESC
+    LIMIT 1) as b
+USING (kod_grupy)
+;
 
 
 -- 14. Ile przedmiotów typu kurs nie miało edycji w żadnym semestrze (nie występują w tabeli przedmiot_semestr)?
@@ -200,5 +247,5 @@ SELECT COUNT(*) FROM
             JOIN semestr USING(semestr_id)
         ) as s
     GROUP BY s.kod_uz
-    HAVING COUNT(s.nazwa)=(SELECT COUNT(*) FROM semestr)) as s;
-
+    HAVING COUNT(s.nazwa)=(SELECT COUNT(*) FROM semestr)) as s
+;
