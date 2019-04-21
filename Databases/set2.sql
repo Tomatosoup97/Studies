@@ -86,21 +86,72 @@ WHERE rodzaj='k'
 GROUP BY przedmiot.kod_przed, przedmiot.nazwa
 ;
 
-
 -- 6. Podaj kody użytkowników, którzy uczęszczali w semestrze letnim 2016/2017
 -- na wykład z 'Baz danych' i nie uczęszczali na wykład z 'Sieci komputerowych',
 -- i odwrotnie. Sformułuj to zapytanie używając instrukcji WITH, by wstępnie
 -- zdefiniować zbiory osób uczęszczających na każdy z wykładów.
 
--- 7. Podaj kody, imiona i nazwiska wszystkich prowadzących, którzy w jakiejś prowadzonej przez siebie grupie mieli więcej zapisanych osób, niż wynosił limit max_osoby dla tej grupy. Do zapisania zapytania użyj GROUP BY i HAVING.
+WITH bd AS
+    (SELECT u.kod_uz FROM uzytkownik as u
+    JOIN wybor USING(kod_uz)
+    JOIN grupa USING(kod_grupy)
+    JOIN przedmiot_semestr USING(kod_przed_sem)
+    JOIN przedmiot USING(kod_przed)
+    JOIN semestr USING(semestr_id)
+    WHERE przedmiot.nazwa='Bazy danych'
+    AND semestr.nazwa LIKE '%letni 2016/2017'
+    AND rodzaj_zajec='w'),
+sk as
+    (SELECT u.kod_uz FROM uzytkownik as u
+    JOIN wybor USING(kod_uz)
+    JOIN grupa USING(kod_grupy)
+    JOIN przedmiot_semestr USING(kod_przed_sem)
+    JOIN przedmiot USING(kod_przed)
+    JOIN semestr USING(semestr_id)
+    WHERE przedmiot.nazwa='Sieci komputerowe'
+    AND semestr.nazwa LIKE '%letni 2016/2017'
+    AND rodzaj_zajec='w')
+((SELECT * FROM bd) EXCEPT (SELECT * FROM sk)) UNION
+((SELECT * FROM sk) EXCEPT (SELECT * FROM bd))
+;
 
--- 8. Podaj nazwę przedmiotu podstawowego, na wykład do którego chodziło najwięcej różnych osób. Użyj w tym celu zapytania z GROUP BY i HAVING (z warunkiem używającym ponownie GROUP BY).
 
--- 9. Dla każdego semestru letniego podaj jego numer oraz nazwisko osoby, która jako pierwsza zapisała się na zajęcia w tym semestrze. Jeśli w semestrze było kilka osób, które zapisały się jednocześnie:
+-- 7. Podaj kody, imiona i nazwiska wszystkich prowadzących, którzy w jakiejś
+-- prowadzonej przez siebie grupie mieli więcej zapisanych osób, niż wynosił
+-- limit max_osoby dla tej grupy. Do zapisania zapytania użyj GROUP BY i HAVING.
+
+
+-- 8. Podaj nazwę przedmiotu podstawowego, na wykład do którego chodziło
+-- najwięcej różnych osób. Użyj w tym celu zapytania z GROUP BY i HAVING
+-- (z warunkiem używającym ponownie GROUP BY).
+
+SELECT przedmiot.nazwa FROM przedmiot
+JOIN przedmiot_semestr USING(kod_przed)
+JOIN grupa USING(kod_przed_sem)
+JOIN wybor USING(kod_grupy)
+WHERE przedmiot.rodzaj='p'
+AND rodzaj_zajec='w'
+GROUP BY przedmiot.kod_przed, przedmiot.nazwa
+ORDER BY COUNT(DISTINCT wybor.kod_uz) DESC
+LIMIT 1
+;
+
+
+-- 9. Dla każdego semestru letniego podaj jego numer oraz nazwisko osoby, która
+-- jako pierwsza zapisała się na zajęcia w tym semestrze. Jeśli w semestrze było
+-- kilka osób, które zapisały się jednocześnie:
 -- 9.1 Podaj wszystkie;
 -- 9.2 Podaj tę o najwcześniejszym leksykograficznie nazwisku.
 
--- 10. Jaka jest średnia liczba osób zapisujących się na wykład w semestrze letnim 2016/2017? Zapisz to zapytanie definiując najpierw pomocniczą relację (np. na liście from z aliasem), w której dla każdego interesującego cię wykładu znajdziesz liczbę zapisanych na niego osób).
 
--- 11. Kto prowadzi w jednym semestrze wykład do przedmiotu i co najmniej dwie grupy innych zajęć do tego przedmiotu (nie muszą być tego samego typu)?
+
+-- 10. Jaka jest średnia liczba osób zapisujących się na wykład w semestrze
+-- letnim 2016/2017? Zapisz to zapytanie definiując najpierw pomocniczą relację
+-- (np. na liście from z aliasem), w której dla każdego interesującego cię
+-- wykładu znajdziesz liczbę zapisanych na niego osób).
+
+
+-- 11. Kto prowadzi w jednym semestrze wykład do przedmiotu i co najmniej dwie
+-- grupy innych zajęć do tego przedmiotu (nie muszą być tego samego typu)?
+
 
