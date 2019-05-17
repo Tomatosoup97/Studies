@@ -7,8 +7,11 @@ node_modules
 
 *.o
 
-# Jupyter notebook
+# Python
+__pycache__
+.mypy_cache
 .ipynb_checkpoints
+*.pyc
 
 # OCaml
 *.cmi
