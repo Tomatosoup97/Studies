@@ -1,0 +1,4 @@
+mypy
+flake8
+psycopg2
+effect
