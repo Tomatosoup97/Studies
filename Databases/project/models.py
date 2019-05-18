@@ -16,6 +16,10 @@ class Member(Model):
         raise NotImplementedError
 
     @classmethod
+    def list(cls, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(**kwargs)
+
+    @classmethod
     def get(cls, **kwargs: QueryParam) -> SQLQuery:
         return super().get(**kwargs)
 
@@ -31,8 +35,7 @@ class Member(Model):
     @staticmethod
     def auth(member_id: int, password: str) -> Any:
         member = Member.get(id=member_id)
-        # TODO
-        member_password = password
+        member_password = password  # TODO
         if not verify_password(member_password, password):
             raise exs.IncorrectCredentials
         return member
@@ -51,6 +54,10 @@ class Project(Model):
         self.id = project_id
         self.timestamp = timestamp
         self.authority = authority
+
+    @classmethod
+    def list(cls, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(**kwargs)
 
     @classmethod
     def get(cls, **kwargs: QueryParam) -> SQLQuery:
@@ -79,6 +86,10 @@ class Action(Model):
         self.member_id = member_id
 
     @classmethod
+    def list(cls, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(**kwargs)
+
+    @classmethod
     def get(cls, **kwargs: QueryParam) -> SQLQuery:
         return super().get(**kwargs)
 
@@ -104,6 +115,10 @@ class Vote(Model):
         self.action_id = action_id
 
     @classmethod
+    def list(cls, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(**kwargs)
+
+    @classmethod
     def get(cls, **kwargs: QueryParam) -> SQLQuery:
         return super().get(**kwargs)
 
@@ -125,6 +140,10 @@ class Query(Model):
     def __init__(self, member_id, timestamp):
         self.member_id = member_id
         self.timestamp = timestamp
+
+    @classmethod
+    def list(cls, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(**kwargs)
 
     @classmethod
     def get(cls, **kwargs: QueryParam) -> SQLQuery:
