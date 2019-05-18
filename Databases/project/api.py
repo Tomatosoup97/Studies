@@ -1,5 +1,5 @@
 import psycopg2
-from typing import List, Tuple, Optional
+from typing import Optional
 
 from models import *
 from exceptions import *
@@ -30,7 +30,7 @@ def _action(
         action: TAction,
         project: TProject,
         authority: Optional[TAuthority]
-    ) -> None:
+    ) -> SQLQuery:
     assert(action_type in [SUPPORT, PROTEST])
     Member.get_or_create(id=member, password=password)
     if user_is_frozen():
@@ -42,15 +42,15 @@ def _action(
             raise InvalidInputError
         Project.create(project=project, authority=authority,
                        timestamp=timestamp)
-    Action.create(id=action, timestamp=timestamp, atype=action_type,
-                  project_id=project, member_id=member)
+    return Action.create(id=action, timestamp=timestamp, atype=action_type,
+                         project_id=project, member_id=member)
 
 
-def support(*args, **kwargs) -> None:
+def support(*args, **kwargs) -> SQLQuery:
     return _action(SUPPORT, *args, **kwargs)
 
 
-def protest(*args, **kwargs) -> None:
+def protest(*args, **kwargs) -> SQLQuery:
     return _action(PROTEST, *args, **kwargs)
 
 
@@ -60,21 +60,21 @@ def _vote(
         member: TMember,
         password: str,
         action: TAction,
-    ) -> None:
+    ) -> SQLQuery:
     assert(vote_type in [VOTE_UP, VOTE_DOWN])
     Member.get_or_create(id=member, password=password)
     if user_is_frozen():
         raise UserIsFrozenError
     Action.get(id=action)
-    Vote.create(timestamp=timestamp, vtype=vote_type,
-                member_id=member, action_id=action)
+    return Vote.create(timestamp=timestamp, vtype=vote_type,
+                       member_id=member, action_id=action)
 
 
-def upvote(*args, **kwargs) -> None:
+def upvote(*args, **kwargs) -> SQLQuery:
     return _vote(VOTE_UP, *args, **kwargs)
 
 
-def downvote(*args, **kwargs) -> None:
+def downvote(*args, **kwargs) -> SQLQuery:
     return _vote(VOTE_DOWN, *args, **kwargs)
 
 
@@ -87,7 +87,7 @@ def actions(
         atype: Optional[TAType],
         project: Optional[TProject],
         authority: Optional[TAuthority],
-    ) -> List[Tuple[TProject, TAuthority]]:
+    ) -> SQLQuery:
     Member.auth_as_leader(member, password)
     Query.create(timestamp=timestamp, member_id=member)
     return Action.get_list(
@@ -103,7 +103,7 @@ def projects(
         member: TMember,
         password: str,
         authority: Optional[TAuthority],
-    ) -> List[Tuple[TProject, TAuthority]]:
+    ) -> SQLQuery:
     Member.auth_as_leader(member, password)
     Query.create(timestamp=timestamp, member_id=member)
     return Project.get_list(
@@ -118,7 +118,7 @@ def votes(
         password: str,
         action: Optional[TAction],
         project: Optional[TProject],
-    ) -> List[Tuple[TMember, TUpvote, TDownvote]]:
+    ) -> SQLQuery:
     Member.auth_as_leader(member, password)
     Query.create(timestamp=timestamp, member_id=member)
     return Vote.get_members_votes(
@@ -128,6 +128,6 @@ def votes(
     )
 
 
-def trolls() -> List[Tuple[TMember, TUpvote, TDownvote, TActive]]:
+def trolls() -> SQLQuery:
     # TODO: Might need to be done on db-level
     pass

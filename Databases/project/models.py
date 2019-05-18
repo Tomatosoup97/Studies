@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 from mytypes import *
 from myhash import hash_password, verify_password
 import exceptions as exs
@@ -72,7 +70,7 @@ class Project(Model):
         return super().create(**kwargs)
 
     @staticmethod
-    def get_list(*args, **kwargs) -> List[Tuple[TProject, TAuthority]]:
+    def get_list(*args, **kwargs) -> SQLQuery:
         raise NotImplementedError
 
 
@@ -102,7 +100,7 @@ class Action(Model):
         return super().create(**kwargs)
 
     @staticmethod
-    def get_list(*args, **kwargs) -> List[Tuple[TProject, TAuthority]]:
+    def get_list(*args, **kwargs) -> SQLQuery:
         raise NotImplementedError
 
 
@@ -131,8 +129,7 @@ class Vote(Model):
         return super().create(**kwargs)
 
     @staticmethod
-    def get_members_votes(*args, **kwargs) \
-            -> List[Tuple[TMember, TUpvote, TDownvote]]:
+    def get_members_votes(*args, **kwargs) -> SQLQuery:
         raise NotImplementedError
 
 

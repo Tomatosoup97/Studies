@@ -5,9 +5,11 @@ import api
 from mytypes import *
 from common import compose as C
 
+list_ = lambda x: list(x)
+
 
 def process_request(request: RequestType) -> ResponseType:
-    dispatcher: t.Dict[str, t.Callable[..., t.Optional[Any]]] = {
+    dispatcher: t.Dict[str, t.Callable[..., t.Optional[SQLQuery]]] = {
         "open": api.open_conn,
         "leader": api.leader,
         # Actions
@@ -27,7 +29,7 @@ def process_request(request: RequestType) -> ResponseType:
     if data is not None:
         return ResponseType({
             "status": "OK",
-            "data": list(map(list, data)),
+            "data": list(map(list_, data)),
         })
     return ResponseType({"status": "OK"})
 
