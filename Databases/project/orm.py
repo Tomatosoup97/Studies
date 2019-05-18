@@ -1,8 +1,7 @@
 from toolz.curried import map
-from toolz.functoolz import curry
+from toolz.functoolz import curry, compose as C
 
 from mytypes import *
-from common import compose as C
 
 
 def _join_queries(q2: SQLQuery, q1: SQLQuery) -> SQLQuery:

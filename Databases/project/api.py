@@ -42,16 +42,17 @@ def _action(
             raise InvalidInputError
         Project.create(project=project, authority=authority,
                        timestamp=timestamp)
+
     return Action.create(id=action, timestamp=timestamp, atype=action_type,
                          project_id=project, member_id=member)
 
 
-def support(*args, **kwargs) -> SQLQuery:
-    return _action(SUPPORT, *args, **kwargs)
+def support(**kwargs) -> SQLQuery:
+    return _action(SUPPORT, **kwargs)
 
 
-def protest(*args, **kwargs) -> SQLQuery:
-    return _action(PROTEST, *args, **kwargs)
+def protest(**kwargs) -> SQLQuery:
+    return _action(PROTEST, **kwargs)
 
 
 def _vote(

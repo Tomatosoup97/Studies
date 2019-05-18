@@ -1,9 +1,9 @@
 import json
 import typing as t
+from toolz.functoolz import compose as C
 
 import api
 from mytypes import *
-from common import compose as C
 
 list_ = lambda x: list(x)
 
@@ -14,7 +14,7 @@ def process_request(request: RequestType) -> ResponseType:
         "leader": api.leader,
         # Actions
         "support": api.support,
-        "protest": api.support,
+        "protest": api.protest,
         "upvote": api.upvote,
         "downvote": api.downvote,
         # Queries
