@@ -7,7 +7,7 @@ from common import compose as C
 
 
 def process_request(request: RequestType) -> ResponseType:
-    dispatcher: t.Dict[str, t.Callable[..., t.Optional[t.List]]] = {
+    dispatcher: t.Dict[str, t.Callable[..., t.Optional[Any]]] = {
         "open": api.open_conn,
         "leader": api.leader,
         # Actions
@@ -33,6 +33,7 @@ def process_request(request: RequestType) -> ResponseType:
 
 
 if __name__ == "__main__":
+    # TODO: close db connection
     while True:
         request = C(RequestType, json.loads, input)(">")
         response = process_request(request)

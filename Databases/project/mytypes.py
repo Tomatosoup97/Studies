@@ -22,9 +22,16 @@ ValueType = Union[str, int]
 
 RequestType = NewType(
     'RequestType',
-    Dict[str, Dict[str, ValueType]]
+    Dict[str, Dict[str, ValueType]],
 )
 ResponseType = NewType(
     'ResponseType',
     Dict[str, Union[str, List[Any]]],
+)
+
+QueryParam = Union[str, int]
+
+SQLQuery = NewType(
+    'SQLQuery',
+    Tuple[str, Dict[str, QueryParam]],
 )

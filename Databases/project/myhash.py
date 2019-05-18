@@ -16,11 +16,11 @@ def hash_password(password: str) -> str:
     return (salt + pwdhash).decode('ascii')
 
 
-def verify_password(stored_password, provided_password):
+def verify_password(stored_password: str, provided_password: str) -> bool:
     salt = stored_password[:SALT_LEN]
     stored_password = stored_password[SALT_LEN:]
-    pwdhash = hashlib.pbkdf2_hmac(HASHING_ALG,
-                                  provided_password.encode('utf-8'),
-                                  salt.encode('ascii'), ITERATIONS)
-    pwdhash = binascii.hexlify(pwdhash).decode('ascii')
+    pwdhashb = hashlib.pbkdf2_hmac(HASHING_ALG,
+                                   provided_password.encode('utf-8'),
+                                   salt.encode('ascii'), ITERATIONS)
+    pwdhash = binascii.hexlify(pwdhashb).decode('ascii')
     return pwdhash == stored_password
