@@ -32,18 +32,16 @@ class Member(Model):
 
     @staticmethod
     def auth(member_id: int, password: str) -> Any:
-        member = Member.get(id=member_id)
+        yield Member.get(id=member_id)
         member_password = password  # TODO
         if not verify_password(member_password, password):
             raise exs.IncorrectCredentials
-        return member
 
     @classmethod
     def auth_as_leader(cls, member_id: int, password: str) -> Any:
-        member = cls.auth(member_id, password)
-        if not member.is_leader:
+        yield from cls.auth(member_id, password)
+        if False:  # TODO member.is_leader
             raise exs.Forbidden
-        return member
 
 
 class Project(Model):
