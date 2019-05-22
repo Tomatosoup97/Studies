@@ -39,14 +39,13 @@ def _action(
     user = yield Effect(Member.get_or_create(id=member, password=password))
     if user_is_frozen():
         raise UserIsFrozenError
-    try:
-        yield Effect(Project.get(id=project))
-    except DoesNotExist:
+    project_f = yield Effect(Project.get(id=project))
+    project_res = project_f()
+    if len(project_res) == 0:
         if authority is None:
             raise InvalidInputError
-        yield Effect(Project.create(project=project, authority=authority,
+        yield Effect(Project.create(id=project, authority=authority,
                                     timestamp=timestamp))
-
     yield Effect(Action.create(
         id=action, timestamp=timestamp, atype=action_type,
         project_id=project, member_id=member))

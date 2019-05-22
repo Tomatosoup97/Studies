@@ -15,16 +15,18 @@ class Member(Model):
         raise NotImplementedError
 
     @classmethod
-    def list(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(**kwargs)
+    def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(_fields, **kwargs)
 
     @classmethod
-    def get(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().get(**kwargs)
+    def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().get(_fields, **kwargs)
 
     @classmethod
-    def get_or_create(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().get_or_create(**kwargs)
+    def get_or_create(cls, _fields: QueryFields=None,
+                      **kwargs: QueryParam) -> SQLQuery:
+        kwargs['password'] = hash_password(str(kwargs['password']))
+        return super().get_or_create(_fields, **kwargs)
 
     @classmethod
     def create(cls, **kwargs: QueryParam) -> SQLQuery:
@@ -54,16 +56,17 @@ class Project(Model):
         self.authority = authority
 
     @classmethod
-    def list(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(**kwargs)
+    def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(_fields, **kwargs)
 
     @classmethod
-    def get(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().get(**kwargs)
+    def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().get(_fields, **kwargs)
 
     @classmethod
-    def get_or_create(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().get_or_create(**kwargs)
+    def get_or_create(cls, _fields: QueryFields=None,
+                      **kwargs: QueryParam) -> SQLQuery:
+        return super().get_or_create(_fields, **kwargs)
 
     @classmethod
     def create(cls, **kwargs: QueryParam) -> SQLQuery:
@@ -84,16 +87,17 @@ class Action(Model):
         self.member_id = member_id
 
     @classmethod
-    def list(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(**kwargs)
+    def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(_fields, **kwargs)
 
     @classmethod
-    def get(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().get(**kwargs)
+    def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().get(_fields, **kwargs)
 
     @classmethod
-    def get_or_create(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().get_or_create(**kwargs)
+    def get_or_create(cls, _fields: QueryFields=None,
+                      **kwargs: QueryParam) -> SQLQuery:
+        return super().get_or_create(_fields, **kwargs)
 
     @classmethod
     def create(cls, **kwargs: QueryParam) -> SQLQuery:
@@ -113,16 +117,17 @@ class Vote(Model):
         self.action_id = action_id
 
     @classmethod
-    def list(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(**kwargs)
+    def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(_fields, **kwargs)
 
     @classmethod
-    def get(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().get(**kwargs)
+    def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().get(_fields, **kwargs)
 
     @classmethod
-    def get_or_create(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().get_or_create(**kwargs)
+    def get_or_create(cls, _fields: QueryFields=None,
+                      **kwargs: QueryParam) -> SQLQuery:
+        return super().get_or_create(_fields, **kwargs)
 
     @classmethod
     def create(cls, **kwargs: QueryParam) -> SQLQuery:
@@ -139,16 +144,17 @@ class Query(Model):
         self.timestamp = timestamp
 
     @classmethod
-    def list(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(**kwargs)
+    def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(_fields, **kwargs)
 
     @classmethod
-    def get(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().get(**kwargs)
+    def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().get(_fields, **kwargs)
 
     @classmethod
-    def get_or_create(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().get_or_create(**kwargs)
+    def get_or_create(cls, _fields: QueryFields=None,
+                      **kwargs: QueryParam) -> SQLQuery:
+        return super().get_or_create(_fields, **kwargs)
 
     @classmethod
     def create(cls, **kwargs: QueryParam) -> SQLQuery:

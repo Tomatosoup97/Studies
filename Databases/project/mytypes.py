@@ -30,12 +30,17 @@ ResponseType = NewType(
 )
 
 QueryParam = Union[str, int]
+QueryFields = Optional[Tuple[str]]
 
 
 class SQLQuery:
-    def __init__(self, q: str, params: Dict[str, QueryParam]) -> None:
+    def __init__(self,
+                 q: str,
+                 params: Dict[str, QueryParam],
+                 fields: QueryFields=None) -> None:
         self.q = q
         self.params = params
+        self.fields = fields
 
     def __str__(self) -> str:
         return f"SQLQuery<{self.q}, {str(self.params)}>"

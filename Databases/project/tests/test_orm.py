@@ -32,12 +32,6 @@ class TestORM:
         assert res.q == "SELECT * FROM models WHERE x=%(x)s;"
         assert res.params == params
 
-    def test_list__two_params(self):
-        params = {'x': 'y', 'z': 1}
-        res = Model.list(**params)
-        assert res.q == "SELECT * FROM models WHERE x=%(x)s AND z=%(z)s;"
-        assert res.params == params
-
     def test_list__three_params(self):
         params = {'x': 'y', 'z': 1, 'f': 'g'}
         res = Model.list(**params)
@@ -45,10 +39,22 @@ class TestORM:
             "SELECT * FROM models WHERE x=%(x)s AND z=%(z)s AND f=%(f)s;")
         assert res.params == params
 
+    def test_list__fields(self):
+        params = {'x': 'y'}
+        res = Model.list(_fields=('id', 'name'), **params)
+        assert res.q == "SELECT id, name FROM models WHERE x=%(x)s;"
+        assert res.params == params
+
     def test_get(self):
         params = {'x': 'y'}
         res = Model.get(**params)
         assert res.q == "SELECT * FROM models WHERE x=%(x)s LIMIT 1;"
+        assert res.params == params
+
+    def test_get__fields(self):
+        params = {'x': 'y'}
+        res = Model.get(_fields=("fst", "snd"), **params)
+        assert res.q == "SELECT fst, snd FROM models WHERE x=%(x)s LIMIT 1;"
         assert res.params == params
 
     def test_create(self):

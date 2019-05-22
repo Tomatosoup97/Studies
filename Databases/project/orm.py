@@ -6,12 +6,12 @@ from mytypes import *
 
 @curry
 def join_queries(q2: SQLQuery, q1: SQLQuery) -> SQLQuery:
-    return SQLQuery(f'{q1.q} {q2.q}', {**q1.params, **q2.params})
+    return SQLQuery(f'{q1.q} {q2.q}', {**q1.params, **q2.params}, q2.fields)
 
 
 @curry
-def append_to_query(s: str, query: SQLQuery) -> SQLQuery:
-    return SQLQuery(query.q.replace(';', f' {s};'), query.params)
+def append_to_query(s: str, q: SQLQuery) -> SQLQuery:
+    return SQLQuery(q.q.replace(';', f' {s};'), q.params, q.fields)
 
 
 class Model:
@@ -33,21 +33,24 @@ class Model:
         return f'{cls.__name__.lower()}s'
 
     @classmethod
-    def list(cls, **kwargs: QueryParam) -> SQLQuery:
+    def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        table = cls.table_name()
         conds = C(
             " AND ".join,
             map('='.join),
             map(lambda k: (k, cls._val_holder(k))),
             kwargs.keys
         )()
+        selected = ", ".join(_fields) if _fields is not None else "*"
         conds = f" WHERE {conds}" if conds else ""
-        return SQLQuery(f"SELECT * FROM {cls.table_name()}{conds};", kwargs)
+        query = f"SELECT {selected} FROM {table}{conds};"
+        return SQLQuery(query, kwargs, _fields)
 
     @classmethod
-    def get(cls, **kwargs: QueryParam) -> SQLQuery:
+    def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
         return C(
             append_to_query("LIMIT 1"),
-            lambda k: cls.list(**k),
+            lambda k: cls.list(_fields, **k),
         )(kwargs)
 
     @classmethod
@@ -58,9 +61,10 @@ class Model:
                         f"VALUES ({vals});", kwargs)
 
     @classmethod
-    def get_or_create(cls, **kwargs: QueryParam) -> SQLQuery:
+    def get_or_create(cls, _fields: QueryFields=None,
+                      **kwargs: QueryParam) -> SQLQuery:
         return C(
-            join_queries(cls.get(**kwargs)),
+            join_queries(cls.get(_fields, **kwargs)),
             append_to_query("ON CONFLICT DO NOTHING"),
-            lambda k: cls.create(**k),
-        )(kwargs)
+            lambda: cls.create(**kwargs),
+        )()
