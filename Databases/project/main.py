@@ -11,7 +11,7 @@ import exceptions as exs
 from requests import *
 
 
-DEBUG = True
+DEBUG = False
 db_conn = None
 db_cursor = None
 
@@ -78,23 +78,33 @@ def close_db_conn() -> None:
     db_conn.close()
 
 
+@curry
+def get_response(validate: Callable[[RequestType], RequestType],
+                 request: RequestType) -> ResponseType:
+    try:
+        return C(process_request, validate)(request)
+    except (exs.InternalException, psycopg2.Error) as e:
+        return ResponseType({"status": "ERROR", "debug": str(e)})
+
+
 def run(is_init=False) -> None:
-    C(output_response, process_request,
-      validate_req_action("open"), read_request)()
+    C(output_response,
+      get_response(validate_req_action("open")),
+      read_request)()
 
     while True:
         try:
-            C(output_response, process_request,
-              validate_req(is_init), read_request)()
-        except exs.InternalException as e:
-            response = {"status": "ERROR", "debug": str(e)}
-            C(output_response, ResponseType)(response)
-    else:
-        close_db_conn()
+            C(output_response,
+              get_response(validate_req(is_init)),
+              read_request)()
+        except EOFError:
+            close_db_conn()
+            break
 
 
 if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "--init":
+        # TODO: Initialize database here
         run(is_init=True)
     elif len(sys.argv) == 1:
         run(is_init=False)

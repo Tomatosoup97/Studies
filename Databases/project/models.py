@@ -167,6 +167,10 @@ class Query(Model):
         self.timestamp = timestamp
 
     @classmethod
+    def table_name(cls) -> str:
+        return 'queries'
+
+    @classmethod
     def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
         return super().list(_fields, **kwargs)
 

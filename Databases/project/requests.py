@@ -9,6 +9,14 @@ def req_action(request: RequestType) -> str:
     return list(request.keys())[0]
 
 
+def read_request() -> RequestType:
+    return C(RequestType, json.loads, input)(">")
+
+
+def output_response(response: ResponseType) -> None:
+    C(print, json.dumps)(response)
+
+
 @curry
 def validate_req(is_init: bool, request: RequestType) -> RequestType:
     action = req_action(request)
@@ -17,14 +25,6 @@ def validate_req(is_init: bool, request: RequestType) -> RequestType:
     else:
         assert action not in ["leader", "open"], "Invalid action for request"
     return request
-
-
-def read_request() -> RequestType:
-    return C(RequestType, json.loads, input)(">")
-
-
-def output_response(response: ResponseType) -> None:
-    C(print, json.dumps)(response)
 
 
 @curry
