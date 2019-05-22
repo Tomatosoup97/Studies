@@ -1,14 +1,14 @@
 import sys
-import json
 import typing as t
 
 import psycopg2
-from toolz.functoolz import compose as C, curry
+from toolz.functoolz import compose as C
 from effect import (sync_perform, sync_performer,
                     TypeDispatcher, ComposedDispatcher, base_dispatcher)
 
 import api
-from mytypes import *
+from requests import *
+
 
 DEBUG = True
 db_conn = None
@@ -19,13 +19,13 @@ db_cursor = None
 def perform_sql_query(dispatcher, sqlquery: SQLQuery):
     if DEBUG:
         print(sqlquery)
-    assert(db_cursor is not None)
+    assert db_cursor is not None, "Database is not opened, could not execute"
     db_cursor.execute(sqlquery.q, sqlquery.params)
     return db_cursor.fetchall
 
 
 @sync_performer
-def perform_open_db(dispatcher, intent: OpenDatabase):
+def perform_open_db(dispatcher, intent: OpenDatabase) -> None:
     global db_conn, db_cursor
     if DEBUG:
         print(intent)
@@ -49,8 +49,7 @@ def process_request(request: RequestType) -> ResponseType:
         "votes": api.votes,
         "trolls": api.trolls,
     }
-    action = list(request.keys())[0]
-
+    action = req_action(request)
     effect = api_dispatcher[action](**request[action])
     eff_dispatcher = ComposedDispatcher([
         TypeDispatcher({
@@ -61,6 +60,8 @@ def process_request(request: RequestType) -> ResponseType:
     ])
     sync_perform(eff_dispatcher, effect)
     data = None  # TODO
+    assert db_cursor is not None and db_conn is not None, "DB conn closed"
+    db_conn.commit()
 
     if data is not None:
         return ResponseType({
@@ -70,31 +71,21 @@ def process_request(request: RequestType) -> ResponseType:
     return ResponseType({"status": "OK"})
 
 
-@curry
-def validate_req(is_init: bool, request: RequestType) -> RequestType:
-    assert(len(request.keys()) == 1)
-    action = list(request.keys())[0]
-    if is_init:
-        assert action in ["leader"]
-    else:
-        assert action not in ["leader", "open"]
-    return request
-
-
-def close_db_conn():
+def close_db_conn() -> None:
+    assert db_cursor is not None and db_conn is not None, "DB already closed"
     db_cursor.close()
     db_conn.close()
 
 
 def run(is_init=False) -> None:
-    # TODO: open db connection
-    # TODO: close db connection
+    C(output_response, process_request,
+      validate_req_action("open"), read_request)()
+
     while True:
-        request = C(validate_req(is_init), RequestType, json.loads, input)(">")
-        response = process_request(request)
-        C(print, json.dumps)(response)
+        C(output_response, process_request,
+          validate_req(is_init), read_request)()
     else:
-        close_db_conn()
+        close_db_conn()  # TODO: close db conn on exception
 
 
 if __name__ == "__main__":
