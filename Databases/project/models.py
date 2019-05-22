@@ -2,6 +2,7 @@ from mytypes import *
 from myhash import hash_password, verify_password
 import exceptions as exs
 from orm import Model
+from effect import Effect
 
 
 class Member(Model):
@@ -32,9 +33,10 @@ class Member(Model):
 
     @staticmethod
     def auth(member_id: int, password: str) -> Any:
-        yield Member.get(id=member_id)
+        # TODO: Might want to have separation between models and effects
+        yield Effect(Member.get(id=member_id))
         member_password = password  # TODO
-        if not verify_password(member_password, password):
+        if not verify_password(member_password, password) and False:
             raise exs.IncorrectCredentials
 
     @classmethod

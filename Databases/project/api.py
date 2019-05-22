@@ -1,5 +1,8 @@
-import psycopg2
 from typing import Optional
+
+import psycopg2
+from effect import Effect
+from effect.do import do
 
 from models import *
 from exceptions import *
@@ -16,12 +19,13 @@ def open_conn(database: str, login: str, password: str) -> None:
     return conn.cursor()
 
 
-def leader(password: str, member: TMember) -> SQLQuery:
-    return Member.create(id=member, password=password, is_leader=True)
+def leader(password: str, member: TMember) -> SQLQueryGen:
+    yield Effect(Member.create(id=member, password=password, is_leader=True))
 
 
 # Actions
 
+@do
 def _action(
         action_type: str,
         timestamp: TTime,
@@ -29,106 +33,111 @@ def _action(
         password: str,
         action: TAction,
         project: TProject,
-        authority: Optional[TAuthority]
-    ) -> SQLQuery:
+        authority: Optional[TAuthority] = None,
+    ) -> SQLQueryGen:
     assert(action_type in [SUPPORT, PROTEST])
-    Member.get_or_create(id=member, password=password)
+    user = yield Effect(Member.get_or_create(id=member, password=password))
     if user_is_frozen():
         raise UserIsFrozenError
     try:
-        Project.get(id=project)
+        yield Effect(Project.get(id=project))
     except DoesNotExist:
         if authority is None:
             raise InvalidInputError
-        Project.create(project=project, authority=authority,
-                       timestamp=timestamp)
+        yield Effect(Project.create(project=project, authority=authority,
+                                    timestamp=timestamp))
 
-    return Action.create(id=action, timestamp=timestamp, atype=action_type,
-                         project_id=project, member_id=member)
+    yield Effect(Action.create(
+        id=action, timestamp=timestamp, atype=action_type,
+        project_id=project, member_id=member))
 
 
-def support(**kwargs) -> SQLQuery:
+def support(**kwargs) -> SQLQueryGen:
     return _action(SUPPORT, **kwargs)
 
 
-def protest(**kwargs) -> SQLQuery:
+def protest(**kwargs) -> SQLQueryGen:
     return _action(PROTEST, **kwargs)
 
 
+@do
 def _vote(
         vote_type: str,
         timestamp: TTime,
         member: TMember,
         password: str,
         action: TAction,
-    ) -> SQLQuery:
+    ) -> SQLQueryGen:
     assert(vote_type in [VOTE_UP, VOTE_DOWN])
-    Member.get_or_create(id=member, password=password)
+    yield Effect(Member.get_or_create(id=member, password=password))
     if user_is_frozen():
         raise UserIsFrozenError
-    Action.get(id=action)
-    return Vote.create(timestamp=timestamp, vtype=vote_type,
-                       member_id=member, action_id=action)
+    yield Effect(Action.get(id=action))
+    yield Effect(Vote.create(timestamp=timestamp, vtype=vote_type,
+                             member_id=member, action_id=action))
 
 
-def upvote(*args, **kwargs) -> SQLQuery:
-    return _vote(VOTE_UP, *args, **kwargs)
+def upvote(**kwargs) -> SQLQueryGen:
+    return _vote(VOTE_UP, **kwargs)
 
 
-def downvote(*args, **kwargs) -> SQLQuery:
-    return _vote(VOTE_DOWN, *args, **kwargs)
+def downvote(**kwargs) -> SQLQueryGen:
+    return _vote(VOTE_DOWN, **kwargs)
 
 
 # Queries
 
+@do
 def actions(
         timestamp: TTime,
         member: TMember,
         password: str,
-        atype: Optional[TAType],
-        project: Optional[TProject],
-        authority: Optional[TAuthority],
-    ) -> SQLQuery:
-    Member.auth_as_leader(member, password)
-    Query.create(timestamp=timestamp, member_id=member)
-    return Action.get_list(
+        atype: Optional[TAType] = None,
+        project: Optional[TProject] = None,
+        authority: Optional[TAuthority] = None,
+    ) -> SQLQueryGen:
+    yield from Member.auth_as_leader(member, password)
+    yield Effect(Query.create(timestamp=timestamp, member_id=member))
+    yield Effect(Action.get_list(
         atype=atype,
         project_id=project,
         authority=authority,
         order_by="id",
-    )
+    ))
 
 
+@do
 def projects(
         timestamp: TTime,
         member: TMember,
         password: str,
-        authority: Optional[TAuthority],
-    ) -> SQLQuery:
-    Member.auth_as_leader(member, password)
-    Query.create(timestamp=timestamp, member_id=member)
-    return Project.get_list(
+        authority: Optional[TAuthority] = None,
+    ) -> SQLQueryGen:
+    yield from Member.auth_as_leader(member, password)
+    yield Effect(Query.create(timestamp=timestamp, member_id=member))
+    yield Effect(Project.get_list(
         authority=authority,
         order_by="id",
-    )
+    ))
 
 
+@do
 def votes(
         timestamp: TTime,
         member: TMember,
         password: str,
-        action: Optional[TAction],
-        project: Optional[TProject],
-    ) -> SQLQuery:
-    Member.auth_as_leader(member, password)
-    Query.create(timestamp=timestamp, member_id=member)
-    return Vote.get_members_votes(
+        action: Optional[TAction] = None,
+        project: Optional[TProject] = None,
+    ) -> SQLQueryGen:
+    yield from Member.auth_as_leader(member, password)
+    yield Effect(Query.create(timestamp=timestamp, member_id=member))
+    yield Effect(Vote.get_members_votes(
         action_id=action,
         project_id=project,
         order_by="member_id",
-    )
+    ))
 
 
-def trolls() -> SQLQuery:
+def trolls() -> SQLQueryGen:
     # TODO: Might need to be done on db-level
     pass

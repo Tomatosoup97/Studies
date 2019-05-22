@@ -31,22 +31,14 @@ ResponseType = NewType(
 
 QueryParam = Union[str, int]
 
-# SQLQuery = Any
-# SQLQuery = NewType(
-#     'SQLQuery',
-#     Any,
-# )
-# SQLQuery = Iterable[Any]
-# SQLQuery = NewType(
-#     'SQLQuery',
-#     Tuple[str, Dict[str, QueryParam]],
-# )
-
 
 class SQLQuery:
     def __init__(self, q: str, params: Dict[str, QueryParam]) -> None:
         self.q = q
         self.params = params
+
+    def __str__(self):
+        return f"SQLQuery<{self.q}, {str(self.params)}>"
 
 
 SQLQueryGen = Iterable[SQLQuery]

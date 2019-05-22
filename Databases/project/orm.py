@@ -4,16 +4,14 @@ from toolz.functoolz import curry, compose as C
 from mytypes import *
 
 
-def _join_queries(q2: SQLQuery, q1: SQLQuery) -> SQLQuery:
+@curry
+def join_queries(q2: SQLQuery, q1: SQLQuery) -> SQLQuery:
     return SQLQuery(f'{q1.q} {q2.q}', {**q1.params, **q2.params})
 
 
-def _append_to_query(s: str, query: SQLQuery) -> SQLQuery:
+@curry
+def append_to_query(s: str, query: SQLQuery) -> SQLQuery:
     return SQLQuery(query.q.replace(';', f' {s};'), query.params)
-
-
-append_to_query = curry(_append_to_query)
-join_queries = curry(_join_queries)
 
 
 class Model:

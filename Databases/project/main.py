@@ -1,15 +1,20 @@
 import json
 import typing as t
 from toolz.functoolz import compose as C
+from effect import (sync_perform, sync_performer,
+                    TypeDispatcher, ComposedDispatcher, base_dispatcher)
 
 import api
 from mytypes import *
 
-list_ = lambda x: list(x)
+
+@sync_performer
+def perform_sql_query(dispatcher, sqlquery: SQLQuery):
+    print(sqlquery)
 
 
 def process_request(request: RequestType) -> ResponseType:
-    dispatcher: t.Dict[str, t.Callable[..., t.Optional[SQLQuery]]] = {
+    api_dispatcher: t.Dict[str, t.Callable[..., t.Optional[Any]]] = {
         "open": api.open_conn,
         "leader": api.leader,
         # Actions
@@ -25,11 +30,19 @@ def process_request(request: RequestType) -> ResponseType:
     }
     assert(len(request.keys()) == 1)
     action = list(request.keys())[0]
-    data = dispatcher[action](**request[action])
+
+    effect = api_dispatcher[action](**request[action])
+    eff_dispatcher = ComposedDispatcher([
+        TypeDispatcher({SQLQuery: perform_sql_query}),
+        base_dispatcher,
+    ])
+    sync_perform(eff_dispatcher, effect)
+    data = None
+
     if data is not None:
         return ResponseType({
             "status": "OK",
-            "data": list(map(list_, data)),
+            "data": list(map(list, data)),
         })
     return ResponseType({"status": "OK"})
 
