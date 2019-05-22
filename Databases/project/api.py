@@ -1,6 +1,5 @@
 from typing import Optional
 
-import psycopg2
 from effect import Effect
 from effect.do import do
 
@@ -14,11 +13,12 @@ def user_is_frozen() -> bool:
 
 # Connection & Leader
 
-def open_conn(database: str, login: str, password: str) -> None:
-    conn = psycopg2.connect(dbname=database, user=login, password=password)
-    return conn.cursor()
+@do
+def open_conn(database: str, login: str, password: str) -> OpenDatabaseGen:
+    yield Effect(OpenDatabase(database, login, password))
 
 
+@do
 def leader(password: str, member: TMember) -> SQLQueryGen:
     yield Effect(Member.create(id=member, password=password, is_leader=True))
 

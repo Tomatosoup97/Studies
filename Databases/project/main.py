@@ -1,20 +1,41 @@
+import sys
 import json
 import typing as t
-from toolz.functoolz import compose as C
+
+import psycopg2
+from toolz.functoolz import compose as C, curry
 from effect import (sync_perform, sync_performer,
                     TypeDispatcher, ComposedDispatcher, base_dispatcher)
 
 import api
 from mytypes import *
 
+DEBUG = True
+db_conn = None
+db_cursor = None
+
 
 @sync_performer
 def perform_sql_query(dispatcher, sqlquery: SQLQuery):
-    print(sqlquery)
+    if DEBUG:
+        print(sqlquery)
+    assert(db_cursor is not None)
+    db_cursor.execute(sqlquery.q, sqlquery.params)
+    return db_cursor.fetchall
+
+
+@sync_performer
+def perform_open_db(dispatcher, intent: OpenDatabase):
+    global db_conn, db_cursor
+    if DEBUG:
+        print(intent)
+    db_conn = psycopg2.connect(dbname=intent.db, user=intent.login,
+                               password=intent.password)
+    db_cursor = db_conn.cursor()
 
 
 def process_request(request: RequestType) -> ResponseType:
-    api_dispatcher: t.Dict[str, t.Callable[..., t.Optional[Any]]] = {
+    api_dispatcher: t.Dict[str, t.Callable[..., ApiGenType]] = {
         "open": api.open_conn,
         "leader": api.leader,
         # Actions
@@ -28,16 +49,18 @@ def process_request(request: RequestType) -> ResponseType:
         "votes": api.votes,
         "trolls": api.trolls,
     }
-    assert(len(request.keys()) == 1)
     action = list(request.keys())[0]
 
     effect = api_dispatcher[action](**request[action])
     eff_dispatcher = ComposedDispatcher([
-        TypeDispatcher({SQLQuery: perform_sql_query}),
+        TypeDispatcher({
+            SQLQuery: perform_sql_query,
+            OpenDatabase: perform_open_db,
+        }),
         base_dispatcher,
     ])
     sync_perform(eff_dispatcher, effect)
-    data = None
+    data = None  # TODO
 
     if data is not None:
         return ResponseType({
@@ -47,9 +70,38 @@ def process_request(request: RequestType) -> ResponseType:
     return ResponseType({"status": "OK"})
 
 
-if __name__ == "__main__":
+@curry
+def validate_req(is_init: bool, request: RequestType) -> RequestType:
+    assert(len(request.keys()) == 1)
+    action = list(request.keys())[0]
+    if is_init:
+        assert action in ["leader"]
+    else:
+        assert action not in ["leader", "open"]
+    return request
+
+
+def close_db_conn():
+    db_cursor.close()
+    db_conn.close()
+
+
+def run(is_init=False) -> None:
+    # TODO: open db connection
     # TODO: close db connection
     while True:
-        request = C(RequestType, json.loads, input)(">")
+        request = C(validate_req(is_init), RequestType, json.loads, input)(">")
         response = process_request(request)
         C(print, json.dumps)(response)
+    else:
+        close_db_conn()
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 2 and sys.argv[1] == "--init":
+        run(is_init=True)
+    elif len(sys.argv) == 1:
+        run(is_init=False)
+    else:
+        print("Invalid execution. Supported params: --init")
+        sys.exit(1)

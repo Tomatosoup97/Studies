@@ -37,8 +37,20 @@ class SQLQuery:
         self.q = q
         self.params = params
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"SQLQuery<{self.q}, {str(self.params)}>"
 
 
+class OpenDatabase:
+    def __init__(self, db: str, login: str, password: str) -> None:
+        self.db = db
+        self.login = login
+        self.password = password
+
+    def __str__(self) -> str:
+        return f"OpenDatabase<db={self.db}, user={self.login}>"
+
+
 SQLQueryGen = Iterable[SQLQuery]
+OpenDatabaseGen = Iterable[SQLQuery]
+ApiGenType = Union[SQLQueryGen, OpenDatabaseGen]
