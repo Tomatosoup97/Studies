@@ -7,6 +7,7 @@ from effect import (sync_perform, sync_performer,
                     TypeDispatcher, ComposedDispatcher, base_dispatcher)
 
 import api
+import exceptions as exs
 from requests import *
 
 
@@ -82,10 +83,14 @@ def run(is_init=False) -> None:
       validate_req_action("open"), read_request)()
 
     while True:
-        C(output_response, process_request,
-          validate_req(is_init), read_request)()
+        try:
+            C(output_response, process_request,
+              validate_req(is_init), read_request)()
+        except exs.InternalException as e:
+            response = {"status": "ERROR", "debug": str(e)}
+            C(output_response, ResponseType)(response)
     else:
-        close_db_conn()  # TODO: close db conn on exception
+        close_db_conn()
 
 
 if __name__ == "__main__":

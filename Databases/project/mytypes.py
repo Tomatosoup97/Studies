@@ -30,7 +30,7 @@ ResponseType = NewType(
 )
 
 QueryParam = Union[str, int]
-QueryFields = Optional[Tuple[str]]
+QueryFields = Optional[List[str]]
 
 
 class SQLQuery:

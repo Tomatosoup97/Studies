@@ -11,8 +11,10 @@ class Member(Model):
         self.password = hash_password(password)
         self.is_leader = is_leader
 
-    def is_frozen(self) -> bool:
-        raise NotImplementedError
+    @staticmethod
+    def is_frozen() -> bool:
+        # TODO: implement
+        return False
 
     @classmethod
     def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
@@ -36,9 +38,10 @@ class Member(Model):
     @staticmethod
     def auth(member_id: int, password: str) -> Any:
         # TODO: Might want to have separation between models and effects
-        yield Effect(Member.get(id=member_id))
-        member_password = password  # TODO
-        if not verify_password(member_password, password) and False:
+        fields = ["password", "is_leader"]
+        user_f = yield Effect(Member.get(_fields=fields, id=member_id))
+        user_password = user_f()[0][0]
+        if not verify_password(user_password, password):
             raise exs.IncorrectCredentials
 
     @classmethod
@@ -46,6 +49,16 @@ class Member(Model):
         yield from cls.auth(member_id, password)
         if False:  # TODO member.is_leader
             raise exs.Forbidden
+
+    @classmethod
+    def custom_get_or_create(cls, member: int, password: str) -> SQLQueryGen:
+        user_f = yield Effect(Member.get(id=member))
+        if len(user_f()) == 0:
+            yield Effect(Member.create(id=member, password=password))
+        elif cls.is_frozen():
+            raise exs.UserIsFrozenError
+        else:
+            yield from Member.auth(member, password)
 
 
 class Project(Model):
@@ -67,6 +80,16 @@ class Project(Model):
     def get_or_create(cls, _fields: QueryFields=None,
                       **kwargs: QueryParam) -> SQLQuery:
         return super().get_or_create(_fields, **kwargs)
+
+    @staticmethod
+    def custom_get_or_create(project: int, timestamp: int,
+                             authority=None) -> SQLQueryGen:
+        project_f = yield Effect(Project.get(id=project))
+        if len(project_f()) == 0:
+            if authority is None:
+                raise exs.InvalidInputError
+            yield Effect(Project.create(id=project, authority=authority,
+                                        timestamp=timestamp))
 
     @classmethod
     def create(cls, **kwargs: QueryParam) -> SQLQuery:

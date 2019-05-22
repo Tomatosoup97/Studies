@@ -1,19 +1,23 @@
+class InternalException(Exception):
+    def __str__(self):
+        return type(self).__name__
 
-class UserIsFrozenError(Exception):
+
+class UserIsFrozenError(InternalException):
     pass
 
 
-class DoesNotExist(Exception):
+class DoesNotExist(InternalException):
     pass
 
 
-class InvalidInputError(Exception):
+class InvalidInputError(InternalException):
     pass
 
 
-class IncorrectCredentials(Exception):
+class IncorrectCredentials(InternalException):
     pass
 
 
-class Forbidden(Exception):
+class Forbidden(InternalException):
     pass

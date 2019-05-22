@@ -7,10 +7,6 @@ from models import *
 from exceptions import *
 
 
-def user_is_frozen() -> bool:
-    return False  # TODO: implement
-
-
 # Connection & Leader
 
 @do
@@ -25,6 +21,7 @@ def leader(password: str, member: TMember) -> SQLQueryGen:
 
 # Actions
 
+
 @do
 def _action(
         action_type: str,
@@ -36,16 +33,8 @@ def _action(
         authority: Optional[TAuthority] = None,
     ) -> SQLQueryGen:
     assert(action_type in [SUPPORT, PROTEST])
-    user = yield Effect(Member.get_or_create(id=member, password=password))
-    if user_is_frozen():
-        raise UserIsFrozenError
-    project_f = yield Effect(Project.get(id=project))
-    project_res = project_f()
-    if len(project_res) == 0:
-        if authority is None:
-            raise InvalidInputError
-        yield Effect(Project.create(id=project, authority=authority,
-                                    timestamp=timestamp))
+    yield from Member.custom_get_or_create(member, password)
+    yield from Project.custom_get_or_create(project, timestamp, authority)
     yield Effect(Action.create(
         id=action, timestamp=timestamp, atype=action_type,
         project_id=project, member_id=member))
@@ -68,9 +57,7 @@ def _vote(
         action: TAction,
     ) -> SQLQueryGen:
     assert(vote_type in [VOTE_UP, VOTE_DOWN])
-    yield Effect(Member.get_or_create(id=member, password=password))
-    if user_is_frozen():
-        raise UserIsFrozenError
+    yield from Member.custom_get_or_create(member, password)
     yield Effect(Action.get(id=action))
     yield Effect(Vote.create(timestamp=timestamp, vtype=vote_type,
                              member_id=member, action_id=action))
