@@ -95,9 +95,11 @@ class Project(Model):
     def create(cls, **kwargs: QueryParam) -> SQLQuery:
         return super().create(**kwargs)
 
-    @staticmethod
-    def get_list(*args, **kwargs) -> SQLQuery:
-        raise NotImplementedError
+    @classmethod
+    def get_list(cls, **kwargs) -> SQLQuery:
+        # TODO
+        _fields = ['id', 'authority']
+        return cls.list(_fields, **kwargs)
 
 
 class Action(Model):
@@ -169,6 +171,7 @@ class Vote(Model):
 
     @staticmethod
     def get_members_votes(*args, **kwargs) -> SQLQuery:
+        # TODO
         raise NotImplementedError
 
 

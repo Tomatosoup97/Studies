@@ -16,13 +16,18 @@ db_conn = None
 db_cursor = None
 
 
-@sync_performer
-def perform_sql_query(dispatcher, sqlquery: SQLQuery):
+def execute_sql_query(sqlquery: SQLQuery):
     if DEBUG:
         print(sqlquery)
     assert db_cursor is not None, "Database is not opened, could not execute"
     db_cursor.execute(sqlquery.q, sqlquery.params)
+    db_conn.commit()
     return db_cursor.fetchall
+
+
+@sync_performer
+def perform_sql_query(dispatcher, sqlquery: SQLQuery):
+    return execute_sql_query(sqlquery)
 
 
 @sync_performer
@@ -61,15 +66,16 @@ def process_request(request: RequestType) -> ResponseType:
     ])
     sync_perform(eff_dispatcher, effect)
     assert db_cursor is not None and db_conn is not None, "DB conn closed"
-    db_conn.commit()
 
-    if db_cursor.rowcount != -1:
+    try:
         data = db_cursor.fetchall()
         return ResponseType({
             "status": "OK",
             "data": list(map(list, data)),
         })
-    return ResponseType({"status": "OK"})
+    except psycopg2.ProgrammingError:
+        # No results to fetch
+        return ResponseType({"status": "OK"})
 
 
 def close_db_conn() -> None:
@@ -87,10 +93,24 @@ def get_response(validate: Callable[[RequestType], RequestType],
         return ResponseType({"status": "ERROR", "debug": str(e)})
 
 
+def init_db() -> None:
+    init_files = (
+        'SQL/0-tables.sql',
+    )
+    for filename in init_files:
+        with open(filename, 'r') as f:
+            q = ' '.join(f.readlines())
+            query = SQLQuery(q, {})
+        execute_sql_query(query)
+
+
 def run(is_init=False) -> None:
     C(output_response,
       get_response(validate_req_action("open")),
       read_request)()
+
+    if is_init:
+        init_db()
 
     while True:
         try:
@@ -102,17 +122,11 @@ def run(is_init=False) -> None:
             break
 
 
-def init_db():
-    # TODO
-    pass
-
-
 if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "--init":
-        init_db()
         run(is_init=True)
     elif len(sys.argv) == 1:
-        run(is_init=False)
+        run()
     else:
         print("Invalid execution. Supported params: --init")
         sys.exit(1)

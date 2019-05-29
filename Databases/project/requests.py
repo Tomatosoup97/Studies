@@ -10,7 +10,7 @@ def req_action(request: RequestType) -> str:
 
 
 def read_request() -> RequestType:
-    return C(RequestType, json.loads, input)(">")
+    return C(RequestType, json.loads, input)("")
 
 
 def output_response(response: ResponseType) -> None:

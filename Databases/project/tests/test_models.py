@@ -1,4 +1,4 @@
-from models import Member
+from models import Member, Project
 
 
 class TestMember():
@@ -10,3 +10,18 @@ class TestMember():
         res = Member.list(**params)
         assert res.q == "SELECT * FROM members WHERE x=%(x)s AND z=%(z)s;"
         assert res.params == params
+
+
+class TestProject():
+    def test_get_list(self):
+        params = {'authority': 1}
+        res = Project.get_list(**params)
+        assert res.q == ("SELECT id, authority FROM projects "
+                         "WHERE authority=%(authority)s;")
+        assert res.params == params
+
+    def test_get_list__none_param(self):
+        params = {'authority': None}
+        res = Project.get_list(**params)
+        assert res.q == ("SELECT id, authority FROM projects;")
+        assert res.params == {}

@@ -34,6 +34,7 @@ class Model:
 
     @classmethod
     def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
         table = cls.table_name()
         conds = C(
             " AND ".join,

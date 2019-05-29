@@ -1,0 +1,5 @@
+{ "open": { "database": "dbproject_test", "login": "postgres", "password": ""}}
+{ "leader": { "password": "abc", "member": 1}}
+{ "leader": { "password": "abc", "member": 2}}
+{ "leader": { "password": "abc", "member": 3}}
+{ "leader": { "password": "abc", "member": 4}}
