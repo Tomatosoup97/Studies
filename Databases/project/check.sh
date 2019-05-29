@@ -2,4 +2,4 @@
 mypy .
 flake8 .
 pytest .
-./run_tests.sh
+#./run_tests.sh

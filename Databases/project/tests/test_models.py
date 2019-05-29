@@ -1,7 +1,7 @@
-from models import Member, Project
+from models import Member, Project, Vote
 
 
-class TestMember():
+class TestMember:
     def test_table_name(self):
         assert Member.table_name() == "members"
 
@@ -12,7 +12,7 @@ class TestMember():
         assert res.params == params
 
 
-class TestProject():
+class TestProject:
     def test_get_list(self):
         params = {'authority': 1}
         res = Project.get_list(**params)
@@ -25,3 +25,25 @@ class TestProject():
         res = Project.get_list(**params)
         assert res.q == ("SELECT id, authority FROM projects;")
         assert res.params == {}
+
+
+class TestVotes:
+    BASE = ("SELECT members.id, "
+            "COUNT(case v.vtype when 'up' then 1 else null end) as upvotes, "
+            "COUNT(case v.vtype when 'down' then 1 else null end) as downvotes"
+            " FROM members "
+            "JOIN votes v ON (v.member_id=members.id) "
+            "JOIN actions a ON (a.id=v.action_id) {}"
+            "GROUP BY members.id ORDER BY members.id;")
+
+    def test_get_members_votes(self):
+        res = Vote.get_members_votes()
+        assert res.q == self.BASE.format("")
+        assert res.params == {}
+
+    def test_get_members_votes__filter(self):
+        params = {'votes.action_id': 10}
+        res = Vote.get_members_votes(**params)
+        assert res.q == self.BASE.format(
+            "WHERE votes.action_id=%(votes.action_id)s ")
+        assert res.params == {'votes.action_id': 10}

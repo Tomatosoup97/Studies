@@ -1,4 +1,4 @@
-from toolz.curried import map
+from toolz.curried import map, filter
 from toolz.functoolz import curry, compose as C
 
 from mytypes import *
@@ -33,18 +33,22 @@ class Model:
         return f'{cls.__name__.lower()}s'
 
     @classmethod
-    def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        table = cls.table_name()
+    def get_conds(cls, **fields: QueryParam) -> str:
         conds = C(
             " AND ".join,
             map('='.join),
             map(lambda k: (k, cls._val_holder(k))),
-            kwargs.keys
+            filter(lambda k: fields[k] is not None),
+            fields.keys
         )()
+        return f" WHERE {conds}" if conds else ""
+
+    @classmethod
+    def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        table = cls.table_name()
         selected = ", ".join(_fields) if _fields is not None else "*"
-        conds = f" WHERE {conds}" if conds else ""
-        query = f"SELECT {selected} FROM {table}{conds};"
+        query = f"SELECT {selected} FROM {table}{cls.get_conds(**kwargs)};"
         return SQLQuery(query, kwargs, _fields)
 
     @classmethod
@@ -69,3 +73,9 @@ class Model:
             append_to_query("ON CONFLICT DO NOTHING"),
             lambda: cls.create(**kwargs),
         )()
+
+    @staticmethod
+    def count(field: str, val: str, name: str) -> str:
+        return (
+            f"COUNT(case {field} when '{val}' then 1 else null end) as {name}"
+        )

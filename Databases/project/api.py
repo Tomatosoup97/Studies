@@ -117,11 +117,8 @@ def votes(
     ) -> SQLQueryGen:
     yield from Member.auth_as_leader(member, password)
     yield Effect(Query.create(timestamp=timestamp, member_id=member))
-    yield Effect(Vote.get_members_votes(
-        action_id=action,
-        project_id=project,
-        order_by="member_id",
-    ))
+    params = {'v.action_id': action, 'a.project_id': project}
+    yield Effect(Vote.get_members_votes(**params))
 
 
 def trolls() -> SQLQueryGen:

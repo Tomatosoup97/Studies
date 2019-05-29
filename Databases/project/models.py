@@ -128,14 +128,12 @@ class Action(Model):
     def create(cls, **kwargs: QueryParam) -> SQLQuery:
         return super().create(**kwargs)
 
-    @staticmethod
-    def get_list(*args, **kwargs) -> SQLQuery:
-        count = lambda p, c, name: (
-            f"COUNT(case {p} when '{c}' then 1 else null end) as {name}")
+    @classmethod
+    def get_list(cls, *args, **kwargs) -> SQLQuery:
         groupby_fields = ['a.id', 'atype', 'project_id', 'authority']
         result_fields = ','.join(groupby_fields + [
-            count('v.vtype', 'up', 'upvotes'),
-            count('v.vtype', 'down', 'downvotes'),
+            cls.count('v.vtype', 'up', 'upvotes'),
+            cls.count('v.vtype', 'down', 'downvotes'),
         ])
         q = (f"SELECT {result_fields} FROM actions as a "
              f"JOIN projects p ON(p.id=project_id) "
@@ -169,10 +167,19 @@ class Vote(Model):
     def create(cls, **kwargs: QueryParam) -> SQLQuery:
         return super().create(**kwargs)
 
-    @staticmethod
-    def get_members_votes(*args, **kwargs) -> SQLQuery:
-        # TODO
-        raise NotImplementedError
+    @classmethod
+    def get_members_votes(cls, **kwargs) -> SQLQuery:
+        fields = ', '.join([
+            'members.id',
+            cls.count('v.vtype', 'up', 'upvotes'),
+            cls.count('v.vtype', 'down', 'downvotes'),
+        ])
+        q = (f"SELECT {fields} FROM members "
+             f"JOIN votes v ON (v.member_id=members.id) "
+             f"JOIN actions a ON (a.id=v.action_id)"
+             f"{cls.get_conds(**kwargs)} "
+             f"GROUP BY members.id ORDER BY members.id;")
+        return SQLQuery(q, kwargs)
 
 
 class Query(Model):
