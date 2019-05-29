@@ -60,11 +60,11 @@ def process_request(request: RequestType) -> ResponseType:
         base_dispatcher,
     ])
     sync_perform(eff_dispatcher, effect)
-    data = None  # TODO
     assert db_cursor is not None and db_conn is not None, "DB conn closed"
     db_conn.commit()
 
-    if data is not None:
+    if db_cursor.rowcount != -1:
+        data = db_cursor.fetchall()
         return ResponseType({
             "status": "OK",
             "data": list(map(list, data)),
@@ -102,9 +102,14 @@ def run(is_init=False) -> None:
             break
 
 
+def init_db():
+    # TODO
+    pass
+
+
 if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "--init":
-        # TODO: Initialize database here
+        init_db()
         run(is_init=True)
     elif len(sys.argv) == 1:
         run(is_init=False)

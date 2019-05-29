@@ -36,10 +36,10 @@ QueryFields = Optional[List[str]]
 class SQLQuery:
     def __init__(self,
                  q: str,
-                 params: Dict[str, QueryParam],
+                 params: Optional[Dict[str, QueryParam]]=None,
                  fields: QueryFields=None) -> None:
         self.q = q
-        self.params = params
+        self.params = params if params is not None else {}
         self.fields = fields
 
     def __str__(self) -> str:

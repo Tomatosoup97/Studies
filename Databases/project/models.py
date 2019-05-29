@@ -128,7 +128,18 @@ class Action(Model):
 
     @staticmethod
     def get_list(*args, **kwargs) -> SQLQuery:
-        raise NotImplementedError
+        count = lambda p, c, name: (
+            f"COUNT(case {p} when '{c}' then 1 else null end) as {name}")
+        groupby_fields = ['a.id', 'atype', 'project_id', 'authority']
+        result_fields = ','.join(groupby_fields + [
+            count('v.vtype', 'up', 'upvotes'),
+            count('v.vtype', 'down', 'downvotes'),
+        ])
+        q = (f"SELECT {result_fields} FROM actions as a "
+             f"JOIN projects p ON(p.id=project_id) "
+             f"JOIN votes v ON (a.id=v.action_id) "
+             f"GROUP BY {','.join(groupby_fields)} ORDER BY a.id;")
+        return SQLQuery(q=q)
 
 
 class Vote(Model):
