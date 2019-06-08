@@ -1,8 +1,13 @@
+from collections import namedtuple
+
 from mytypes import *
 from myhash import hash_password, verify_password
 import exceptions as exs
 from orm import Model
 from effect import Effect
+
+
+MemberData = namedtuple('MemberData', ['password', 'is_leader'])
 
 
 class Member(Model):
@@ -39,15 +44,16 @@ class Member(Model):
     def auth(member_id: int, password: str) -> Any:
         # TODO: Might want to have separation between models and effects
         fields = ["password", "is_leader"]
-        user_f = yield Effect(Member.get(_fields=fields, id=member_id))
-        user_password = user_f()[0][0]
-        if not verify_password(user_password, password):
+        member_f = yield Effect(Member.get(_fields=fields, id=member_id))
+        member = MemberData(*member_f()[0])
+        if not verify_password(member.password, password):
             raise exs.IncorrectCredentials
+        return member
 
     @classmethod
     def auth_as_leader(cls, member_id: int, password: str) -> Any:
-        yield from cls.auth(member_id, password)
-        if False:  # TODO member.is_leader
+        member = yield from cls.auth(member_id, password)
+        if not member.is_leader:
             raise exs.Forbidden
 
     @classmethod
@@ -131,15 +137,16 @@ class Action(Model):
     @classmethod
     def get_list(cls, *args, **kwargs) -> SQLQuery:
         groupby_fields = ['a.id', 'atype', 'project_id', 'authority']
-        result_fields = ','.join(groupby_fields + [
+        result_fields = ', '.join(groupby_fields + [
             cls.count('v.vtype', 'up', 'upvotes'),
             cls.count('v.vtype', 'down', 'downvotes'),
         ])
         q = (f"SELECT {result_fields} FROM actions as a "
              f"JOIN projects p ON(p.id=project_id) "
-             f"JOIN votes v ON (a.id=v.action_id) "
-             f"GROUP BY {','.join(groupby_fields)} ORDER BY a.id;")
-        return SQLQuery(q=q)
+             f"JOIN votes v ON (a.id=v.action_id)"
+             f"{cls.get_conds(**kwargs)} "
+             f"GROUP BY {', '.join(groupby_fields)} ORDER BY a.id;")
+        return SQLQuery(q, kwargs)
 
 
 class Vote(Model):

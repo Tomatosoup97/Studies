@@ -19,5 +19,9 @@ class IncorrectCredentials(InternalException):
     pass
 
 
+class CommandNotSupported(InternalException):
+    pass
+
+
 class Forbidden(InternalException):
     pass

@@ -7,6 +7,14 @@ from models import *
 from exceptions import *
 
 
+def transaction(f):
+    def wrapper(*args, **kwargs):
+        yield Effect(SQLQuery("BEGIN;"))
+        yield from f(*args, **kwargs)
+        yield Effect(SQLQuery("COMMIT;"))
+    return wrapper
+
+
 # Connection & Leader
 
 @do
@@ -23,6 +31,7 @@ def leader(password: str, member: TMember) -> SQLQueryGen:
 
 
 @do
+@transaction
 def _action(
         action_type: str,
         timestamp: TTime,
@@ -49,6 +58,7 @@ def protest(**kwargs) -> SQLQueryGen:
 
 
 @do
+@transaction
 def _vote(
         vote_type: str,
         timestamp: TTime,
@@ -78,17 +88,16 @@ def actions(
         timestamp: TTime,
         member: TMember,
         password: str,
-        atype: Optional[TAType] = None,
+        type: Optional[TAType] = None,
         project: Optional[TProject] = None,
         authority: Optional[TAuthority] = None,
     ) -> SQLQueryGen:
     yield from Member.auth_as_leader(member, password)
     yield Effect(Query.create(timestamp=timestamp, member_id=member))
     yield Effect(Action.get_list(
-        atype=atype,
+        atype=type,
         project_id=project,
         authority=authority,
-        order_by="id",
     ))
 
 
@@ -101,10 +110,7 @@ def projects(
     ) -> SQLQueryGen:
     yield from Member.auth_as_leader(member, password)
     yield Effect(Query.create(timestamp=timestamp, member_id=member))
-    yield Effect(Project.get_list(
-        authority=authority,
-        order_by="id",
-    ))
+    yield Effect(Project.get_list(authority=authority))
 
 
 @do

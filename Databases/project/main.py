@@ -56,7 +56,10 @@ def process_request(request: RequestType) -> ResponseType:
         "trolls": api.trolls,
     }
     action = req_action(request)
-    effect = api_dispatcher[action](**request[action])
+    try:
+        effect = api_dispatcher[action](**request[action])
+    except KeyError:
+        raise exs.CommandNotSupported
     eff_dispatcher = ComposedDispatcher([
         TypeDispatcher({
             SQLQuery: perform_sql_query,
@@ -89,7 +92,10 @@ def get_response(validate: Callable[[RequestType], RequestType],
                  request: RequestType) -> ResponseType:
     try:
         return C(process_request, validate)(request)
-    except (exs.InternalException, psycopg2.Error) as e:
+    except psycopg2.Error as e:
+        execute_sql_query(SQLQuery("ROLLBACK;"))
+        return ResponseType({"status": "ERROR", "debug": type(e).__name__})
+    except (exs.InternalException, AssertionError) as e:
         return ResponseType({"status": "ERROR", "debug": str(e)})
 
 
