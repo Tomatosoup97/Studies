@@ -1,0 +1,18 @@
+{"status": "OK"}
+{"status": "OK"}
+{"status": "ERROR", "debug": "Invalid action for request"}
+{"status": "OK"}
+{"status": "ERROR", "debug": "IncorrectCredentials"}
+{"status": "OK"}
+{"status": "ERROR", "debug": "InvalidInputError"}
+{"status": "OK"}
+{"status": "ERROR", "debug": "CommandNotSupported"}
+{"status": "OK"}
+{"status": "ERROR", "debug": "InvalidTextRepresentation"}
+{"status": "OK"}
+{"status": "OK"}
+{"status": "OK"}
+{"status": "ERROR", "debug": "UniqueVoilation"}
+{"status": "ERROR", "debug": "Forbidden"}
+{"status": "OK", "data": [[500, "protest", 10, 100, 1, 1], [501, "support", 10, 100, 1, 0], [502, "protest", 20, 100, 0, 0], [503, "support", 30, 100, 0, 0], [504, "support", 10, 100, 0, 1]]}
+{"status": "ERROR", "debug": "UniqueVoilation"}

@@ -1,0 +1,8 @@
+{"status": "OK"}
+{"status": "OK"}
+{"status": "ERROR", "debug": "Init requests should define leaders"}
+{"status": "OK"}
+{"status": "ERROR", "debug": "Init requests should define leaders"}
+{"status": "OK"}
+{"status": "ERROR", "debug": "InvalidTextRepresentation"}
+{"status": "OK"}

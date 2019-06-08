@@ -1,0 +1,18 @@
+{ "open": { "database": "dbproject_test", "login": "postgres", "password": ""}}
+{ "protest": { "timestamp": 1557475700, "password": "abc", "member": 1, "action":500, "project": 10, "authority":100}}
+{ "leader": { "password": "abc", "member": 5}}
+{ "support": { "timestamp": 1557475701, "password": "abc", "member": 2, "action":501, "project": 10}}
+{ "protest": { "timestamp": 1557475702, "password": "incorrect_password", "member": 1, "action":502, "project": 20, "authority":100}}
+{ "support": { "timestamp": 1557475703, "password": "abc", "member": 2, "action":503, "project": 30, "authority":200}}
+{ "protest": { "timestamp": 1557475704, "password": "abc", "member": 1, "action":502, "project": 42}}
+{ "upvote": { "timestamp": 1557475705, "password": "abc", "member": 2, "action":500}}
+{ "doesnotexist": { "timestamp": 1557475706, "password": "abc", "member": 1, "action":500}}
+{ "downvote": { "timestamp": 1557475707, "password": "abc", "member": 4, "action":500}}
+{ "upvote": { "timestamp": "invalid_type", "password": "abc", "member": 3, "action":500}}
+{ "support": { "timestamp": 1557475708, "password": "abc", "member": 5, "action":504, "project": 10}}
+{ "downvote": { "timestamp": 1557475709, "password": "abc", "member": 1, "action":504}}
+{ "upvote": { "timestamp": 1557475710, "password": "abc", "member": 5, "action":501}}
+{ "downvote": { "timestamp": 1557475711, "password": "abc", "member": 5, "action":501}}
+{ "actions": { "timestamp": 1557475712, "password": "abc", "member": 5}}
+{ "actions": { "timestamp": 1557475713, "password": "abc", "member": 1}}
+{ "actions": { "timestamp": 1557475713, "password": "abc", "member": 1}}

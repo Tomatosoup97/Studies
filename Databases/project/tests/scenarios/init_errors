@@ -1,0 +1,8 @@
+{ "open": { "database": "dbproject_test", "login": "postgres", "password": ""}}
+{ "leader": { "password": "abc", "member": 1}}
+{ "protest": { "timestamp": 1557475700, "password": "abc", "member": 1, "action":500, "project": 10, "authority":100}}
+{ "leader": { "password": "abc", "member": 2}}
+{ "doesnotexist": { "password": "abc", "member": 3}}
+{ "leader": { "password": "abc", "member": 3}}
+{ "leader": { "password": "abc", "member": "abc"}}
+{ "leader": { "password": "abc", "member": 4}}
