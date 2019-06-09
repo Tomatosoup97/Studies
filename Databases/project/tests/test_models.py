@@ -56,7 +56,7 @@ class TestAction:
             "COUNT(case v.vtype when 'down' then 1 else null end) as downvotes"
             " FROM actions as a "
             "JOIN projects p ON(p.id=project_id) "
-            "JOIN votes v ON (a.id=v.action_id) "
+            "FULL OUTER JOIN votes v ON (a.id=v.action_id) "
             "{}"
             "GROUP BY a.id, atype, project_id, authority ORDER BY a.id;")
 

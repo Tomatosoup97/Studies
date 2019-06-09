@@ -59,7 +59,7 @@ class Member(Model):
     @classmethod
     def custom_get_or_create(cls, member: int, password: str) -> SQLQueryGen:
         user_f = yield Effect(Member.get(id=member))
-        if len(user_f()) == 0:
+        if len(user_f()) == 0:  # type: ignore
             yield Effect(Member.create(id=member, password=password))
         elif cls.is_frozen():
             raise exs.UserIsFrozenError
@@ -91,7 +91,7 @@ class Project(Model):
     def custom_get_or_create(project: int, timestamp: int,
                              authority=None) -> SQLQueryGen:
         project_f = yield Effect(Project.get(id=project))
-        if len(project_f()) == 0:
+        if len(project_f()) == 0:  # type: ignore
             if authority is None:
                 raise exs.InvalidInputError
             yield Effect(Project.create(id=project, authority=authority,
@@ -143,7 +143,7 @@ class Action(Model):
         ])
         q = (f"SELECT {result_fields} FROM actions as a "
              f"JOIN projects p ON(p.id=project_id) "
-             f"JOIN votes v ON (a.id=v.action_id)"
+             f"FULL OUTER JOIN votes v ON (a.id=v.action_id)"
              f"{cls.get_conds(**kwargs)} "
              f"GROUP BY {', '.join(groupby_fields)} ORDER BY a.id;")
         return SQLQuery(q, kwargs)
