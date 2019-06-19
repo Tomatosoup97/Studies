@@ -103,7 +103,6 @@ class Project(Model):
 
     @classmethod
     def get_list(cls, **kwargs) -> SQLQuery:
-        # TODO
         _fields = ['id', 'authority']
         return cls.list(_fields, **kwargs)
 

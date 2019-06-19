@@ -4,9 +4,15 @@ Python >= 3.6
 
 ## Setup project
 
-./build.sh
+    ./build.sh
 
 ## Run tests and typechecker
 
-./check.sh
+    ./check.sh
+    ./run_tests.sh
+
+## Run program
+
+    python main.py --init
+    python main.py
 

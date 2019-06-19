@@ -16,3 +16,5 @@
 { "actions": { "timestamp": 1557475712, "password": "abc", "member": 5}}
 { "actions": { "timestamp": 1557475713, "password": "abc", "member": 1}}
 { "actions": { "timestamp": 1557475713, "password": "abc", "member": 1}}
+{ "projects": { "timestamp": 1557475714, "password": "niehaslo", "member": 1, "authority": 100}}
+{ "projects": { "timestamp": 1557475715, "password": "abc", "member": 5, "authority": 100}}

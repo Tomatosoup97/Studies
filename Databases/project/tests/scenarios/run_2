@@ -18,3 +18,5 @@
 { "actions": { "timestamp": 1557475715, "password": "abc", "member": 1, "project": 32, "authority": 200}}
 { "actions": { "timestamp": 1557475716, "password": "abc", "member": 1, "type": "support"}}
 { "actions": { "timestamp": 1557475717, "password": "abc", "member": 1, "type": "protest", "authority": 100}}
+{ "projects": { "timestamp": 1557475718, "password": "abc", "member": 1}}
+{ "projects": { "timestamp": 1557475719, "password": "abc", "member": 1, "authority": 100}}

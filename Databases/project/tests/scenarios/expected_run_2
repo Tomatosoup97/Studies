@@ -18,3 +18,5 @@
 {"status": "OK", "data": []}
 {"status": "OK", "data": [[501, "support", 10, 100, 1, 2], [503, "support", 30, 200, 0, 0]]}
 {"status": "OK", "data": [[500, "protest", 10, 100, 3, 1], [502, "protest", 20, 100, 0, 1]]}
+{"status": "OK", "data": [[10, 100], [20, 100], [30, 200]]}
+{"status": "OK", "data": [[10, 100], [20, 100]]}

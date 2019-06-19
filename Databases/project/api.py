@@ -7,7 +7,7 @@ from models import *
 from exceptions import *
 
 
-def transaction(f):
+def transaction(f: Callable) -> Callable:
     def wrapper(*args, **kwargs):
         yield Effect(SQLQuery("BEGIN;"))
         yield from f(*args, **kwargs)
