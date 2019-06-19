@@ -3,7 +3,8 @@
 CREATE TABLE members (
     id integer PRIMARY KEY,
     password varchar(255) NOT NULL,
-    is_leader boolean DEFAULT false
+    is_leader boolean DEFAULT false,
+    last_active integer NOT NULL
 );
 
 CREATE TABLE projects (
@@ -27,10 +28,4 @@ CREATE TABLE votes (
     action_id integer REFERENCES actions (id) NOT NULL,
     member_id integer REFERENCES members (id) NOT NULL,
     UNIQUE (action_id, member_id)
-);
-
-CREATE TABLE queries (
-    timestamp integer NOT NULL,
-    member_id integer REFERENCES members (id) NOT NULL,
-    PRIMARY KEY (timestamp, member_id)
 );

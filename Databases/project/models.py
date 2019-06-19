@@ -1,3 +1,4 @@
+import datetime
 from collections import namedtuple
 
 from mytypes import *
@@ -6,8 +7,8 @@ import exceptions as exs
 from orm import Model
 from effect import Effect
 
-
-MemberData = namedtuple('MemberData', ['password', 'is_leader'])
+LA_THRESHOLD = 31 * 6  # 6 months
+MemberData = namedtuple('MemberData', ['password', 'is_leader', 'last_active'])
 
 
 class Member(Model):
@@ -15,11 +16,6 @@ class Member(Model):
         self.id = id
         self.password = hash_password(password)
         self.is_leader = is_leader
-
-    @staticmethod
-    def is_frozen() -> bool:
-        # TODO: implement
-        return False
 
     @classmethod
     def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
@@ -41,30 +37,49 @@ class Member(Model):
         return super().create(**kwargs)
 
     @staticmethod
-    def auth(member_id: int, password: str) -> Any:
-        # TODO: Might want to have separation between models and effects
-        fields = ["password", "is_leader"]
+    def is_frozen(member: MemberData) -> bool:
+        threshold = int((
+            datetime.datetime.now() - datetime.timedelta(days=LA_THRESHOLD)
+        ).timestamp())
+        return member.last_active < threshold
+
+    @classmethod
+    def set_last_active(cls, member_id: int, timestamp: int) -> Any:
+        conds = cls.get_conds(id=member_id)
+        ts_value = cls._val_holder("timestamp")
+        return SQLQuery(  # type: ignore
+            f"UPDATE members SET last_active={ts_value}{conds};",
+            {"id": member_id, "timestamp": timestamp})
+
+    @classmethod
+    def auth(cls, member_id: int, password: str, timestamp: int) -> Any:
+        fields = ["password", "is_leader", "last_active"]
         member_f = yield Effect(Member.get(_fields=fields, id=member_id))
         member = MemberData(*member_f()[0])
         if not verify_password(member.password, password):
             raise exs.IncorrectCredentials
+        if cls.is_frozen(member):
+            raise exs.UserIsFrozenError
+        yield Effect(cls.set_last_active(member_id, timestamp))
         return member
 
     @classmethod
-    def auth_as_leader(cls, member_id: int, password: str) -> Any:
-        member = yield from cls.auth(member_id, password)
+    def auth_as_leader(cls, member_id: int, password: str,
+                       timestamp: int) -> Any:
+        member = yield from cls.auth(member_id, password, timestamp)
         if not member.is_leader:
             raise exs.Forbidden
 
     @classmethod
-    def custom_get_or_create(cls, member: int, password: str) -> SQLQueryGen:
+    def custom_get_or_create(
+            cls, member: int, password: str, timestamp: int,
+        ) -> SQLQueryGen:
         user_f = yield Effect(Member.get(id=member))
         if len(user_f()) == 0:  # type: ignore
-            yield Effect(Member.create(id=member, password=password))
-        elif cls.is_frozen():
-            raise exs.UserIsFrozenError
+            yield Effect(Member.create(id=member, password=password,
+                                       last_active=timestamp))
         else:
-            yield from Member.auth(member, password)
+            yield from Member.auth(member, password, timestamp)
 
 
 class Project(Model):
@@ -186,30 +201,3 @@ class Vote(Model):
              f"{cls.get_conds(**kwargs)} "
              f"GROUP BY members.id ORDER BY members.id;")
         return SQLQuery(q, kwargs)
-
-
-class Query(Model):
-    def __init__(self, member_id, timestamp):
-        self.member_id = member_id
-        self.timestamp = timestamp
-
-    @classmethod
-    def table_name(cls) -> str:
-        return 'queries'
-
-    @classmethod
-    def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(_fields, **kwargs)
-
-    @classmethod
-    def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().get(_fields, **kwargs)
-
-    @classmethod
-    def get_or_create(cls, _fields: QueryFields=None,
-                      **kwargs: QueryParam) -> SQLQuery:
-        return super().get_or_create(_fields, **kwargs)
-
-    @classmethod
-    def create(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().create(**kwargs)
