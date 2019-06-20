@@ -39,9 +39,10 @@ class Member(Model):
         return super().create(**kwargs)
 
     @staticmethod
-    def is_frozen(member: MemberData) -> bool:
+    def is_frozen(member: MemberData) -> Any:
+        current_date = yield Effect(CurrentDatetime())  # type: ignore
         threshold = int((
-            datetime.datetime.now() - datetime.timedelta(days=LA_THRESHOLD)
+            current_date - datetime.timedelta(days=LA_THRESHOLD)
         ).timestamp())
         return member.last_active < threshold
 
@@ -68,7 +69,7 @@ class Member(Model):
         fields = ["password", "is_leader", "last_active", "is_active"]
         member_f = yield Effect(Member.get(_fields=fields, id=member_id))
         member = MemberData(*member_f()[0])
-        is_frozen = cls.is_frozen(member)
+        is_frozen = yield from cls.is_frozen(member)
         if not verify_password(member.password, password):
             raise exs.IncorrectCredentials
         if is_frozen:

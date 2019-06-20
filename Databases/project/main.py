@@ -1,5 +1,6 @@
 import sys
 import typing as t
+from datetime import datetime
 
 import psycopg2
 from toolz.functoolz import compose as C
@@ -28,6 +29,11 @@ def execute_sql_query(sqlquery: SQLQuery):
 @sync_performer
 def perform_sql_query(dispatcher, sqlquery: SQLQuery):
     return execute_sql_query(sqlquery)
+
+
+@sync_performer
+def perform_current_datetime(*args) -> datetime:
+    return datetime.now()
 
 
 @sync_performer
@@ -64,6 +70,7 @@ def process_request(request: RequestType) -> ResponseType:
         TypeDispatcher({
             SQLQuery: perform_sql_query,
             OpenDatabase: perform_open_db,
+            CurrentDatetime: perform_current_datetime,
         }),
         base_dispatcher,
     ])

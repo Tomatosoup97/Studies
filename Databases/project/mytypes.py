@@ -56,6 +56,10 @@ class OpenDatabase:
         return f"OpenDatabase<db={self.db}, user={self.login}>"
 
 
+class CurrentDatetime:
+    pass
+
+
 SQLQueryGen = Iterable[SQLQuery]
 OpenDatabaseGen = Iterable[SQLQuery]
 ApiGenType = Union[SQLQueryGen, OpenDatabaseGen]
