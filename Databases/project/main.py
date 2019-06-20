@@ -108,7 +108,7 @@ def get_response(validate: Callable[[RequestType], RequestType],
 
 def init_db() -> None:
     init_files = (
-        'SQL/0-tables.sql',
+        'SQL/1-tables.sql',
     )
     for filename in init_files:
         with open(filename, 'r') as f:

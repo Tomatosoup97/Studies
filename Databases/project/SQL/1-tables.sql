@@ -40,3 +40,14 @@ CREATE TABLE user_actions_votes (
     downvotes integer DEFAULT 0,
     UNIQUE (member_id, action_id)
 );
+
+DROP ROLE IF EXISTS app;
+CREATE ROLE app WITH encrypted password 'passwd' LOGIN;
+GRANT ALL ON DATABASE dbproject_test TO app;
+GRANT ALL ON members TO app;
+GRANT ALL ON projects TO app;
+GRANT ALL ON actions TO app;
+GRANT ALL ON votes TO app;
+GRANT ALL ON votes_id_seq TO app;
+GRANT ALL ON user_actions_votes TO app;
+GRANT ALL ON user_actions_votes_id_seq TO app;

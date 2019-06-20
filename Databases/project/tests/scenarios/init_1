@@ -1,3 +1,3 @@
-{ "open": { "database": "dbproject_test", "login": "postgres", "password": ""}}
+{ "open": { "database": "dbproject_test", "login": "init", "password": "passwd"}}
 { "leader": { "timestamp": 1557475700, "password": "abc", "member": 1}}
 { "leader": { "timestamp": 1557475701, "password": "asd", "member": 2}}
