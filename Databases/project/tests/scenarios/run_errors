@@ -9,15 +9,16 @@
 { "doesnotexist": { "timestamp": 1557475706, "password": "abc", "member": 1, "action":500}}
 { "downvote": { "timestamp": 1557475707, "password": "abc", "member": 4, "action":500}}
 { "upvote": { "timestamp": "invalid_type", "password": "abc", "member": 3, "action":500}}
-{ "support": { "timestamp": 1557475708, "password": "abc", "member": 5, "action":504, "project": 10}}
+{ "support": { "timestamp": 1557475708, "password": "abc", "member": 7, "action":504, "project": 10}}
 { "downvote": { "timestamp": 1557475709, "password": "abc", "member": 1, "action":504}}
-{ "upvote": { "timestamp": 1557475710, "password": "abc", "member": 5, "action":501}}
-{ "downvote": { "timestamp": 1557475711, "password": "abc", "member": 5, "action":501}}
-{ "actions": { "timestamp": 1557475712, "password": "abc", "member": 5}}
-{ "actions": { "timestamp": 1557475713, "password": "abc", "member": 1}}
-{ "actions": { "timestamp": 1557475713, "password": "abc", "member": 1}}
-{ "projects": { "timestamp": 1557475714, "password": "niehaslo", "member": 1, "authority": 100}}
-{ "projects": { "timestamp": 1557475715, "password": "abc", "member": 5, "authority": 100}}
-{ "projects": { "timestamp": 1557475716, "password": "def", "member": 6}}
-{ "support": { "timestamp": 1557475717, "password": "def", "member": 6, "action":505, "project": 10}}
-{ "downvote": { "timestamp": 1557475711, "password": "def", "member": 6, "action":501}}
+{ "upvote": { "timestamp": 1557475710, "password": "abc", "member": 7, "action":501}}
+{ "downvote": { "timestamp": 1557475711, "password": "abc", "member": 7, "action":501}}
+{ "actions": { "timestamp": 1557475712, "password": "abc", "member": 7}}
+{ "actions": { "timestamp": 1557475714, "password": "abc", "member": 1}}
+{ "projects": { "timestamp": 1557475715, "password": "niehaslo", "member": 1, "authority": 100}}
+{ "projects": { "timestamp": 1557475716, "password": "abc", "member": 7, "authority": 100}}
+{ "projects": { "timestamp": 1557475717, "password": "def", "member": 6}}
+{ "support": { "timestamp": 1557475718, "password": "def", "member": 6, "action":505, "project": 10}}
+{ "downvote": { "timestamp": 1557475719, "password": "def", "member": 6, "action":501}}
+{ "downvote": { "timestamp": 1557475720, "password": "abc", "member": 1, "action":505}}
+{ "trolls": { "timestamp": 1557475720 }}

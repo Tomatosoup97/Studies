@@ -48,6 +48,7 @@ def _action(
     yield Effect(Action.create(
         id=action, timestamp=timestamp, atype=action_type,
         project_id=project, member_id=member))
+    yield Effect(UserActionVote.create(member_id=member, action_id=action))
 
 
 def support(**kwargs) -> SQLQueryGen:
@@ -69,9 +70,14 @@ def _vote(
     ) -> SQLQueryGen:
     assert(vote_type in [VOTE_UP, VOTE_DOWN])
     yield from Member.custom_get_or_create(member, password, timestamp)
-    yield Effect(Action.get(id=action))
+    action_f = yield Effect(Action.get(id=action, _fields=['member_id']))
+    actions = action_f()  # type: ignore
+    if len(actions) == 0:
+        raise exs.DoesNotExist
+    action_member_id = actions[0][0]
     yield Effect(Vote.create(timestamp=timestamp, vtype=vote_type,
                              member_id=member, action_id=action))
+    yield Effect(UserActionVote.add_vote(action_member_id, action, vote_type))
 
 
 def upvote(**kwargs) -> SQLQueryGen:
@@ -125,6 +131,6 @@ def votes(
     yield Effect(Vote.get_members_votes(**params))
 
 
-def trolls() -> SQLQueryGen:
-    # TODO: Might need to be done on db-level
-    pass
+@do
+def trolls(timestamp: int) -> SQLQueryGen:
+    yield Effect(UserActionVote.get_list())

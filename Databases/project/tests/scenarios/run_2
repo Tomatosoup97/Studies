@@ -20,3 +20,6 @@
 { "actions": { "timestamp": 1557475717, "password": "abc", "member": 1, "type": "protest", "authority": 100}}
 { "projects": { "timestamp": 1557475718, "password": "abc", "member": 1}}
 { "projects": { "timestamp": 1557475719, "password": "abc", "member": 1, "authority": 100}}
+{ "downvote": { "timestamp": 1557475720, "password": "abc", "member": 2, "action":502}}
+{ "downvote": { "timestamp": 1557475721, "password": "abc", "member": 3, "action":502}}
+{ "trolls" : { "timestamp": 1557475722 }}

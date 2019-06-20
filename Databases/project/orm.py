@@ -44,11 +44,19 @@ class Model:
         return f" WHERE {conds}" if conds else ""
 
     @classmethod
-    def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+    def get_ordering(cls, _order_by: QueryFields=None):
+        fields = ", ".join(_order_by) if _order_by is not None else ""
+        return f" ORDER BY {fields}" if fields else ""
+
+    @classmethod
+    def list(cls, _fields: QueryFields=None,
+             _order_by: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         table = cls.table_name()
         selected = ", ".join(_fields) if _fields is not None else "*"
-        query = f"SELECT {selected} FROM {table}{cls.get_conds(**kwargs)};"
+        query = (f"SELECT {selected} FROM {table}"
+                 f"{cls.get_conds(**kwargs)}"
+                 f"{cls.get_ordering(_order_by)};")
         return SQLQuery(query, kwargs, _fields)
 
     @classmethod

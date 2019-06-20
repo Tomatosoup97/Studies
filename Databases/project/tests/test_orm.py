@@ -45,6 +45,12 @@ class TestORM:
         assert res.q == "SELECT id, name FROM models WHERE x=%(x)s;"
         assert res.params == params
 
+    def test_list__ordering(self):
+        params = {'x': 'y'}
+        res = Model.list(_order_by=('id', 'name'), **params)
+        assert res.q == "SELECT * FROM models WHERE x=%(x)s ORDER BY id, name;"
+        assert res.params == params
+
     def test_get(self):
         params = {'x': 'y'}
         res = Model.get(**params)

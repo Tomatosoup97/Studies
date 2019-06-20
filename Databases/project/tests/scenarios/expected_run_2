@@ -20,3 +20,6 @@
 {"status": "OK", "data": [[500, "protest", 10, 100, 3, 1], [502, "protest", 20, 100, 0, 1]]}
 {"status": "OK", "data": [[10, 100], [20, 100], [30, 200]]}
 {"status": "OK", "data": [[10, 100], [20, 100]]}
+{"status": "OK"}
+{"status": "OK"}
+{"status": "OK", "data": [[1, 0, 3, true], [2, 1, 2, true]]}

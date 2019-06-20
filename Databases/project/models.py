@@ -8,7 +8,8 @@ from orm import Model
 from effect import Effect
 
 LA_THRESHOLD = 31 * 6  # 6 months
-MemberData = namedtuple('MemberData', ['password', 'is_leader', 'last_active'])
+MemberData = namedtuple('MemberData', ['password', 'is_leader',
+                                       'last_active', 'is_active'])
 
 
 class Member(Model):
@@ -18,8 +19,9 @@ class Member(Model):
         self.is_leader = is_leader
 
     @classmethod
-    def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(_fields, **kwargs)
+    def list(cls, _fields: QueryFields=None,
+             _order_by: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(_fields, _order_by, **kwargs)
 
     @classmethod
     def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
@@ -44,22 +46,35 @@ class Member(Model):
         return member.last_active < threshold
 
     @classmethod
-    def set_last_active(cls, member_id: int, timestamp: int) -> Any:
+    def set_last_active(cls, member_id: int, timestamp: int) -> SQLQuery:
         conds = cls.get_conds(id=member_id)
         ts_value = cls._val_holder("timestamp")
         return SQLQuery(  # type: ignore
-            f"UPDATE members SET last_active={ts_value}{conds};",
+            f"UPDATE {cls.table_name()} SET last_active={ts_value}{conds};",
             {"id": member_id, "timestamp": timestamp})
 
     @classmethod
+    def set_is_active(cls, member_id: int, is_active: bool) -> Any:
+        conds = cls.get_conds(id=member_id)
+        is_active_v = str(is_active).lower()
+        q = lambda t: f"UPDATE {t} SET is_active={is_active_v}{conds};"
+        yield Effect(SQLQuery(  # type: ignore
+            q(cls.table_name()), {"id": member_id}))
+        yield Effect(SQLQuery(  # type: ignore
+            q(UserActionVote.table_name()), {"id": member_id}))
+
+    @classmethod
     def auth(cls, member_id: int, password: str, timestamp: int) -> Any:
-        fields = ["password", "is_leader", "last_active"]
+        fields = ["password", "is_leader", "last_active", "is_active"]
         member_f = yield Effect(Member.get(_fields=fields, id=member_id))
         member = MemberData(*member_f()[0])
+        is_frozen = cls.is_frozen(member)
         if not verify_password(member.password, password):
             raise exs.IncorrectCredentials
-        if cls.is_frozen(member):
+        if is_frozen:
             raise exs.UserIsFrozenError
+        if is_frozen != member.is_active:
+            yield from cls.set_is_active(member_id, not is_frozen)
         yield Effect(cls.set_last_active(member_id, timestamp))
         return member
 
@@ -90,8 +105,9 @@ class Project(Model):
         self.authority = authority
 
     @classmethod
-    def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(_fields, **kwargs)
+    def list(cls, _fields: QueryFields=None,
+             _order_by: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(_fields, _order_by, **kwargs)
 
     @classmethod
     def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
@@ -132,8 +148,9 @@ class Action(Model):
         self.member_id = member_id
 
     @classmethod
-    def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(_fields, **kwargs)
+    def list(cls, _fields: QueryFields=None,
+             _order_by: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(_fields, _order_by, **kwargs)
 
     @classmethod
     def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
@@ -172,8 +189,9 @@ class Vote(Model):
         self.action_id = action_id
 
     @classmethod
-    def list(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(_fields, **kwargs)
+    def list(cls, _fields: QueryFields=None,
+             _order_by: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(_fields, _order_by, **kwargs)
 
     @classmethod
     def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
@@ -201,3 +219,47 @@ class Vote(Model):
              f"{cls.get_conds(**kwargs)} "
              f"GROUP BY members.id ORDER BY members.id;")
         return SQLQuery(q, kwargs)
+
+
+class UserActionVote(Model):
+    @classmethod
+    def table_name(cls) -> str:
+        return 'user_actions_votes'
+
+    @classmethod
+    def list(cls, _fields: QueryFields=None,
+             _order_by: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().list(_fields, _order_by, **kwargs)
+
+    @classmethod
+    def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+        return super().get(_fields, **kwargs)
+
+    @classmethod
+    def get_or_create(cls, _fields: QueryFields=None,
+                      **kwargs: QueryParam) -> SQLQuery:
+        return super().get_or_create(_fields, **kwargs)
+
+    @classmethod
+    def create(cls, **kwargs: QueryParam) -> SQLQuery:
+        return super().create(**kwargs)
+
+    @classmethod
+    def get_list(cls, **kwargs) -> SQLQuery:
+        _fields = ",".join(['member_id', 'upvotes', 'downvotes', 'is_active'])
+        _order_by = ['(downvotes - upvotes) DESC', 'member_id']
+        return SQLQuery(
+            (f"SELECT {_fields} FROM {cls.table_name()} "
+             f"WHERE (downvotes - upvotes) > 0"
+             f"{cls.get_ordering(_order_by)};")
+        )
+
+    @classmethod
+    def add_vote(cls, member_id: int,
+                 action_id: int, vote_type: str) -> SQLQuery:
+        assert(vote_type in [VOTE_UP, VOTE_DOWN])
+        col = f"{vote_type}votes"
+        params = {'member_id': member_id, 'action_id': action_id}
+        conds = cls.get_conds(**params)
+        return SQLQuery(  # type: ignore
+            f"UPDATE {cls.table_name()} SET {col}={col}+1 {conds};", params)

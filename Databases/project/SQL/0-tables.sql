@@ -4,7 +4,8 @@ CREATE TABLE members (
     id integer PRIMARY KEY,
     password varchar(255) NOT NULL,
     is_leader boolean DEFAULT false,
-    last_active integer NOT NULL
+    last_active integer NOT NULL,
+    is_active boolean DEFAULT true
 );
 
 CREATE TABLE projects (
@@ -28,4 +29,14 @@ CREATE TABLE votes (
     action_id integer REFERENCES actions (id) NOT NULL,
     member_id integer REFERENCES members (id) NOT NULL,
     UNIQUE (action_id, member_id)
+);
+
+CREATE TABLE user_actions_votes (
+    id serial PRIMARY KEY,
+    member_id integer REFERENCES members (id) NOT NULL,
+    action_id integer REFERENCES actions (id) NOT NULL,
+    is_active boolean DEFAULT true,
+    upvotes integer DEFAULT 0,
+    downvotes integer DEFAULT 0,
+    UNIQUE (member_id, action_id)
 );

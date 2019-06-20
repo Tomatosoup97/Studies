@@ -11,7 +11,7 @@ import exceptions as exs
 from requests import *
 
 
-DEBUG = False
+DEBUG = 0
 db_conn = None
 db_cursor = None
 
