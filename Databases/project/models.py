@@ -13,20 +13,6 @@ MemberData = namedtuple('MemberData', ['password', 'is_leader',
 
 
 class Member(Model):
-    def __init__(self, id: int, password: str, is_leader=False):
-        self.id = id
-        self.password = hash_password(password)
-        self.is_leader = is_leader
-
-    @classmethod
-    def list(cls, _fields: QueryFields=None,
-             _order_by: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(_fields, _order_by, **kwargs)
-
-    @classmethod
-    def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().get(_fields, **kwargs)
-
     @classmethod
     def get_or_create(cls, _fields: QueryFields=None,
                       **kwargs: QueryParam) -> SQLQuery:
@@ -48,21 +34,15 @@ class Member(Model):
 
     @classmethod
     def set_last_active(cls, member_id: int, timestamp: int) -> SQLQuery:
-        conds = cls.get_conds(id=member_id)
-        ts_value = cls._val_holder("timestamp")
-        return SQLQuery(  # type: ignore
-            f"UPDATE {cls.table_name()} SET last_active={ts_value}{conds};",
-            {"id": member_id, "timestamp": timestamp})
+        return cls.update("last_active", "timestamp",
+                          timestamp, {'id': member_id})
 
     @classmethod
     def set_is_active(cls, member_id: int, is_active: bool) -> Any:
-        conds = cls.get_conds(id=member_id)
         is_active_v = str(is_active).lower()
-        q = lambda t: f"UPDATE {t} SET is_active={is_active_v}{conds};"
-        yield Effect(SQLQuery(  # type: ignore
-            q(cls.table_name()), {"id": member_id}))
-        yield Effect(SQLQuery(  # type: ignore
-            q(UserActionVote.table_name()), {"id": member_id}))
+        params = ["is_active", "is_active_v", is_active_v, {'id': member_id}]
+        yield Effect(cls.update(*params))  # type: ignore
+        yield Effect(UserActionVote.update(*params))  # type: ignore
 
     @classmethod
     def auth(cls, member_id: int, password: str, timestamp: int) -> Any:
@@ -99,26 +79,6 @@ class Member(Model):
 
 
 class Project(Model):
-    def __init__(self, project_id: int, timestamp: int,
-                 authority: int) -> None:
-        self.id = project_id
-        self.timestamp = timestamp
-        self.authority = authority
-
-    @classmethod
-    def list(cls, _fields: QueryFields=None,
-             _order_by: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(_fields, _order_by, **kwargs)
-
-    @classmethod
-    def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().get(_fields, **kwargs)
-
-    @classmethod
-    def get_or_create(cls, _fields: QueryFields=None,
-                      **kwargs: QueryParam) -> SQLQuery:
-        return super().get_or_create(_fields, **kwargs)
-
     @staticmethod
     def custom_get_or_create(project: int, timestamp: int,
                              authority=None) -> SQLQueryGen:
@@ -130,42 +90,12 @@ class Project(Model):
                                         timestamp=timestamp))
 
     @classmethod
-    def create(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().create(**kwargs)
-
-    @classmethod
     def get_list(cls, **kwargs) -> SQLQuery:
         _fields = ['id', 'authority']
         return cls.list(_fields, **kwargs)
 
 
 class Action(Model):
-    def __init__(self, id, timestamp: int, atype: str,
-                 project_id: int, member_id: int) -> None:
-        self.id = id
-        self.timestamp = timestamp
-        self.atype = atype
-        self.project_id = project_id
-        self.member_id = member_id
-
-    @classmethod
-    def list(cls, _fields: QueryFields=None,
-             _order_by: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(_fields, _order_by, **kwargs)
-
-    @classmethod
-    def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().get(_fields, **kwargs)
-
-    @classmethod
-    def get_or_create(cls, _fields: QueryFields=None,
-                      **kwargs: QueryParam) -> SQLQuery:
-        return super().get_or_create(_fields, **kwargs)
-
-    @classmethod
-    def create(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().create(**kwargs)
-
     @classmethod
     def get_list(cls, *args, **kwargs) -> SQLQuery:
         groupby_fields = ['a.id', 'atype', 'project_id', 'authority']
@@ -182,31 +112,6 @@ class Action(Model):
 
 
 class Vote(Model):
-    def __init__(self, timestamp: int, vtype: str,
-                 member_id: int, action_id: int) -> None:
-        self.timestamp = timestamp
-        self.vtype = vtype
-        self.member_id = member_id
-        self.action_id = action_id
-
-    @classmethod
-    def list(cls, _fields: QueryFields=None,
-             _order_by: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(_fields, _order_by, **kwargs)
-
-    @classmethod
-    def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().get(_fields, **kwargs)
-
-    @classmethod
-    def get_or_create(cls, _fields: QueryFields=None,
-                      **kwargs: QueryParam) -> SQLQuery:
-        return super().get_or_create(_fields, **kwargs)
-
-    @classmethod
-    def create(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().create(**kwargs)
-
     @classmethod
     def get_members_votes(cls, **kwargs) -> SQLQuery:
         fields = ', '.join([
@@ -228,32 +133,11 @@ class UserActionVote(Model):
         return 'user_actions_votes'
 
     @classmethod
-    def list(cls, _fields: QueryFields=None,
-             _order_by: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().list(_fields, _order_by, **kwargs)
-
-    @classmethod
-    def get(cls, _fields: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
-        return super().get(_fields, **kwargs)
-
-    @classmethod
-    def get_or_create(cls, _fields: QueryFields=None,
-                      **kwargs: QueryParam) -> SQLQuery:
-        return super().get_or_create(_fields, **kwargs)
-
-    @classmethod
-    def create(cls, **kwargs: QueryParam) -> SQLQuery:
-        return super().create(**kwargs)
-
-    @classmethod
     def get_list(cls, **kwargs) -> SQLQuery:
-        _fields = ",".join(['member_id', 'upvotes', 'downvotes', 'is_active'])
+        _fields = ['member_id', 'upvotes', 'downvotes', 'is_active']
         _order_by = ['(downvotes - upvotes) DESC', 'member_id']
-        return SQLQuery(
-            (f"SELECT {_fields} FROM {cls.table_name()} "
-             f"WHERE (downvotes - upvotes) > 0"
-             f"{cls.get_ordering(_order_by)};")
-        )
+        _conds = ["(downvotes - upvotes) > 0"]
+        return cls.list(_fields, _order_by, _conds, **kwargs)
 
     @classmethod
     def add_vote(cls, member_id: int,

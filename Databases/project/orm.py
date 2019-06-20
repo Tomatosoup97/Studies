@@ -1,5 +1,7 @@
 from toolz.curried import map, filter
 from toolz.functoolz import curry, compose as C
+from itertools import chain
+from functools import partial as P
 
 from mytypes import *
 
@@ -33,9 +35,10 @@ class Model:
         return f'{cls.__name__.lower()}s'
 
     @classmethod
-    def get_conds(cls, **fields: QueryParam) -> str:
+    def get_conds(cls, _conds: List[str]=None, **fields: QueryParam) -> str:
         conds = C(
             " AND ".join,
+            P(chain, _conds or []),
             map('='.join),
             map(lambda k: (k, cls._val_holder(k))),
             filter(lambda k: fields[k] is not None),
@@ -50,12 +53,14 @@ class Model:
 
     @classmethod
     def list(cls, _fields: QueryFields=None,
-             _order_by: QueryFields=None, **kwargs: QueryParam) -> SQLQuery:
+             _order_by: QueryFields=None,
+             _conds: List[str]=None,
+             **kwargs: QueryParam) -> SQLQuery:
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         table = cls.table_name()
         selected = ", ".join(_fields) if _fields is not None else "*"
         query = (f"SELECT {selected} FROM {table}"
-                 f"{cls.get_conds(**kwargs)}"
+                 f"{cls.get_conds(_conds, **kwargs)}"
                  f"{cls.get_ordering(_order_by)};")
         return SQLQuery(query, kwargs, _fields)
 
@@ -87,3 +92,11 @@ class Model:
         return (
             f"COUNT(case {field} when '{val}' then 1 else null end) as {name}"
         )
+
+    @classmethod
+    def update(cls, field: str, val_name: str, value,
+               selector: QueryParamsDict) -> SQLQuery:
+        conds = cls.get_conds([], **selector)
+        val_holder = cls._val_holder(val_name)
+        q = f"UPDATE {cls.table_name()} SET {field}={val_holder}{conds};"
+        return SQLQuery(q, {**selector, val_name: value})  # type: ignore

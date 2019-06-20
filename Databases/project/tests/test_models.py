@@ -13,6 +13,13 @@ class TestMember:
 
 
 class TestProject:
+    def test_get(self):
+        params = {'id': 1}
+        res = Project.get(**params)
+        assert res.q == ("SELECT * FROM projects "
+                         "WHERE id=%(id)s LIMIT 1;")
+        assert res.params == params
+
     def test_get_list(self):
         params = {'authority': 1}
         res = Project.get_list(**params)
@@ -24,6 +31,11 @@ class TestProject:
         params = {'authority': None}
         res = Project.get_list(**params)
         assert res.q == ("SELECT id, authority FROM projects;")
+        assert res.params == {}
+
+    def test_list(self):
+        res = Project.list()
+        assert res.q == ("SELECT * FROM projects;")
         assert res.params == {}
 
 

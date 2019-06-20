@@ -30,6 +30,7 @@ ResponseType = NewType(
 )
 
 QueryParam = Union[str, int]
+QueryParamsDict = Dict[str, QueryParam]
 QueryFields = Optional[List[str]]
 
 

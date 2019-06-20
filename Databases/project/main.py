@@ -107,14 +107,11 @@ def get_response(validate: Callable[[RequestType], RequestType],
 
 
 def init_db() -> None:
-    init_files = (
-        'SQL/1-tables.sql',
-    )
+    init_files = ('SQL/1-tables.sql',)
     for filename in init_files:
         with open(filename, 'r') as f:
             q = ' '.join(f.readlines())
-            query = SQLQuery(q, {})
-        execute_sql_query(query)
+        execute_sql_query(SQLQuery(q, {}))
 
 
 def run(is_init=False) -> None:
